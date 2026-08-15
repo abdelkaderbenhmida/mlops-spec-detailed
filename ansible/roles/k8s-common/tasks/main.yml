@@ -1,0 +1,83 @@
+---
+- name: Ensure kernel modules for containerd
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  become: true
+
+- name: Configure sysctl for Kubernetes
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+    reload: true
+  loop:
+    - {key: net.bridge.bridge-nf-call-iptables, value: "1"}
+    - {key: net.bridge.bridge-nf-call-ip6tables, value: "1"}
+    - {key: net.ipv4.ip_forward, value: "1"}
+  become: true
+
+- name: Add Kubernetes apt key
+  apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key
+    state: present
+  become: true
+
+- name: Add Kubernetes apt repository
+  apt_repository:
+    repo: "deb https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /"
+    state: present
+  become: true
+
+- name: Install kubelet, kubeadm, kubectl
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    update_cache: true
+    state: present
+  become: true
+
+- name: Hold Kubernetes packages
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  become: true
+
+- name: Configure containerd for Kubernetes
+  copy:
+    dest: /etc/containerd/config.toml
+    content: |
+      version = 2
+      [plugins."io.containerd.grpc.v1.cri"]
+        [plugins."io.containerd.grpc.v1.cri".containerd]
+          default_runtime_name = "runc"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+            runtime_type = "io.containerd.runc.v2"
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+        endpoint = ["https://registry-1.docker.io"]
+    mode: "0644"
+  become: true
+  notify: restart containerd
+
+- name: Start and enable kubelet
+  systemd:
+    name: kubelet
+    enabled: true
+    state: started
+  become: true
+
+- name: Disable swap (required by kubeadm)
+  shell: swapoff -a && sed -i '/ swap / s/^/#/' /etc/fstab
+  args:
+    warn: false
+  become: true

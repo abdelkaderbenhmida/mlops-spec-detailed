@@ -1,0 +1,6 @@
+---
+- name: 04 - MLflow tracking server + model registry
+  hosts: mlflow
+  gather_facts: true
+  roles:
+    - mlflow

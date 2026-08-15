@@ -1,0 +1,54 @@
+# Configuration for the churn ML pipeline.
+# Loaded by ml/training/train.py, ml/training/preprocess.py,
+# ml/training/features.py and ml/evaluation/evaluate.py.
+
+mlflow:
+  tracking_uri: "http://10.0.2.30:5000"
+  experiment_name: "churn_prediction"
+  model_name: "churn-model"
+  artifact_path: "model"
+
+data:
+  raw_path: "ml/data/raw/telco_churn.csv"
+  processed_dir: "ml/data/processed"
+  processed_file: "ml/data/processed/telco_churn_processed.csv"
+  test_size: 0.2
+  random_state: 42
+  target: "churn"
+
+features:
+  numeric:
+    - tenure
+    - monthly_charges
+  categorical:
+    - gender
+    - senior_citizen
+    - partner
+    - dependents
+    - phone_service
+    - multiple_lines
+    - internet_service
+    - online_security
+    - online_backup
+    - device_protection
+    - tech_support
+    - streaming_tv
+    - streaming_movies
+    - contract
+    - paperless_billing
+    - payment_method
+
+model:
+  # RandomForestClassifier hyperparameters (logged to MLflow as params).
+  n_estimators: 200
+  max_depth: 12
+  min_samples_split: 10
+  min_samples_leaf: 4
+  max_features: "sqrt"
+  class_weight: "balanced"
+  n_jobs: -1
+
+evaluation:
+  probability_threshold: 0.5
+  # F1 must not regress by more than this vs current Production (spec section 9).
+  max_f1_regression: 0.01

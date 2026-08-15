@@ -1,0 +1,111 @@
+---
+- name: Install PostgreSQL
+  apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+  become: true
+
+- name: Start and enable PostgreSQL
+  systemd:
+    name: postgresql
+    enabled: true
+    state: started
+  become: true
+
+- name: Listen on the private interface
+  lineinfile:
+    path: /etc/postgresql/14/main/postgresql.conf
+    regexp: "^#?listen_addresses"
+    line: "listen_addresses = '{{ postgres_host }}'"
+  become: true
+  notify: restart postgresql
+
+- name: Allow private subnet connections
+  lineinfile:
+    path: /etc/postgresql/14/main/pg_hba.conf
+    regexp: "^host.*10\\.0\\.2\\.0/24"
+    line: "host    all             all             10.0.2.0/24            md5"
+  become: true
+  notify: restart postgresql
+
+- name: Create mlops application user
+  postgresql_user:
+    name: "{{ postgres_app_user }}"
+    password: "{{ postgres_app_password }}"
+    role_attr_flags: LOGIN
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create mlops database
+  postgresql_db:
+    name: "{{ postgres_app_db }}"
+    owner: "{{ postgres_app_user }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create mlflow user
+  postgresql_user:
+    name: "{{ postgres_mlflow_user }}"
+    password: "{{ postgres_mlflow_password }}"
+    role_attr_flags: LOGIN,CREATEDB
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create mlflow database
+  postgresql_db:
+    name: "{{ postgres_mlflow_db }}"
+    owner: "{{ postgres_mlflow_user }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Initialize predictions schema
+  postgresql_query:
+    db: "{{ postgres_app_db }}"
+    query: |
+      CREATE TABLE IF NOT EXISTS predictions (
+        id SERIAL PRIMARY KEY,
+        input_payload JSONB NOT NULL,
+        prediction VARCHAR(50) NOT NULL,
+        probability FLOAT,
+        model_name VARCHAR(100),
+        model_version VARCHAR(20),
+        model_stage VARCHAR(20),
+        latency_ms FLOAT,
+        created_at TIMESTAMP DEFAULT now()
+      );
+    session_role: "{{ postgres_app_user }}"
+  become: true
+  become_user: postgres
+
+- name: Initialize model_metadata table
+  postgresql_query:
+    db: "{{ postgres_app_db }}"
+    query: |
+      CREATE TABLE IF NOT EXISTS model_metadata (
+        id SERIAL PRIMARY KEY,
+        model_name VARCHAR(100),
+        version VARCHAR(20),
+        stage VARCHAR(20),
+        metrics JSONB,
+        promoted_at TIMESTAMP DEFAULT now()
+      );
+    session_role: "{{ postgres_app_user }}"
+  become: true
+  become_user: postgres
+
+- name: Grant app user privileges on mlops database
+  postgresql_privs:
+    db: "{{ postgres_app_db }}"
+    role: "{{ postgres_app_user }}"
+    objs: ALL_IN_SCHEMA
+    schema: public
+    privs: SELECT,INSERT,UPDATE,DELETE
+  become: true
+  become_user: postgres

@@ -1,0 +1,50 @@
+---
+- name: Install Jenkins prerequisites
+  apt:
+    name:
+      - openjdk-17-jdk
+      - gnupg
+    state: present
+  become: true
+
+- name: Add Jenkins apt key
+  apt_key:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    state: present
+  become: true
+
+- name: Add Jenkins apt repository
+  apt_repository:
+    repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+    state: present
+  become: true
+
+- name: Install Jenkins
+  apt:
+    name: jenkins
+    update_cache: true
+    state: present
+  become: true
+
+- name: Add Jenkins user to docker group
+  user:
+    name: jenkins
+    groups: docker
+    append: true
+  become: true
+
+- name: Configure Jenkins to listen on 8080
+  lineinfile:
+    path: /etc/default/jenkins
+    regexp: "^HTTP_PORT="
+    line: "HTTP_PORT=8080"
+  become: true
+  notify: restart jenkins
+
+- name: Start and enable Jenkins
+  systemd:
+    name: jenkins
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true

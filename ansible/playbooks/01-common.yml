@@ -1,0 +1,6 @@
+---
+- name: 01 - Common base configuration
+  hosts: all
+  gather_facts: true
+  roles:
+    - common

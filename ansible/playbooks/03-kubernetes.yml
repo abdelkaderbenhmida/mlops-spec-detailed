@@ -1,0 +1,16 @@
+---
+- name: 03 - Kubernetes cluster
+  hosts: k8s
+  gather_facts: true
+  roles:
+    - k8s-common
+- name: Control plane
+  hosts: k8s_masters
+  gather_facts: true
+  roles:
+    - k8s-control-plane
+- name: Workers
+  hosts: k8s_workers
+  gather_facts: true
+  roles:
+    - k8s-worker

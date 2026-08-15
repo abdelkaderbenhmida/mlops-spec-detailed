@@ -1,0 +1,64 @@
+---
+- name: Initialize the Kubernetes cluster with kubeadm
+  shell: |
+    kubeadm init \
+      --apiserver-advertise-address={{ k8s_control_plane_ip }} \
+      --pod-network-cidr={{ k8s_pod_network_cidr }} \
+      --service-cidr={{ k8s_service_cidr }} \
+      --kubernetes-version=v{{ k8s_version }} \
+      > /tmp/kubeadm-init.log 2>&1
+  args:
+    creates: /etc/kubernetes/admin.conf
+  become: true
+
+- name: Create kube config directory for admin user
+  file:
+    path: "/home/{{ admin_user }}/.kube"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+  become: true
+
+- name: Copy admin kubeconfig for the admin user
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ admin_user }}/.kube/config"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0600"
+    remote_src: true
+  become: true
+
+- name: Install flannel CNI
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl apply -f {{ flannel_manifest_url }}
+  args:
+    warn: false
+    creates: /tmp/.flannel-installed
+  become: true
+
+- name: Create join token
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubeadm token create --print-join-command
+  register: join_command
+  become: true
+
+- name: Store join command for workers
+  copy:
+    content: |
+      {{ join_command.stdout }}
+    dest: /etc/kubernetes/join-command.sh
+    mode: "0600"
+  become: true
+
+- name: Wait for control-plane readiness
+  shell: |
+    export KUBECONFIG=/etc/kubernetes/admin.conf
+    kubectl wait --for=condition=Ready node/{{ inventory_hostname }} --timeout=180s
+  register: cp_ready
+  until: cp_ready is succeeded
+  retries: 6
+  delay: 10
+  become: true

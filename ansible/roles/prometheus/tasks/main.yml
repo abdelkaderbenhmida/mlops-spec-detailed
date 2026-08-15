@@ -1,0 +1,89 @@
+---
+- name: Create Prometheus user
+  user:
+    name: prometheus
+    system: true
+    shell: /usr/sbin/nologin
+  become: true
+
+- name: Create Prometheus directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+    - /etc/prometheus/rules
+  become: true
+
+- name: Download Prometheus
+  unarchive:
+    src: https://github.com/prometheus/prometheus/releases/download/v2.47.2/prometheus-2.47.2.linux-amd64.tar.gz
+    dest: /tmp
+    remote_src: true
+    owner: prometheus
+    group: prometheus
+  become: true
+
+- name: Install Prometheus binaries
+  copy:
+    src: "/tmp/prometheus-2.47.2.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: "0755"
+    remote_src: true
+  loop:
+    - prometheus
+    - promtool
+  become: true
+
+- name: Install Prometheus configuration
+  copy:
+    src: prometheus.yml
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: "0644"
+  become: true
+  notify: restart prometheus
+
+- name: Install alert rules
+  copy:
+    src: alert.rules.yml
+    dest: /etc/prometheus/rules/alert.rules.yml
+    owner: prometheus
+    group: prometheus
+    mode: "0644"
+  become: true
+  notify: restart prometheus
+
+- name: Create Prometheus systemd unit
+  copy:
+    dest: /etc/systemd/system/prometheus.service
+    content: |
+      [Unit]
+      Description=Prometheus Server
+      After=network.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      ExecStart=/usr/local/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus \
+        --web.listen-address=0.0.0.0:9090
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: "0644"
+  become: true
+
+- name: Start and enable Prometheus
+  systemd:
+    name: prometheus
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true

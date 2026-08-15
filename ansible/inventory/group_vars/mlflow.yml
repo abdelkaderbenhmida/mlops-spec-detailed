@@ -1,0 +1,5 @@
+---
+# Variables for the mlflow host (VM06).
+mlflow_version: "2.7.1"
+mlflow_artifact_root: "/opt/mlflow/artifacts"
+mlflow_backend_store_uri: "postgresql://{{ postgres_mlflow_user }}:{{ postgres_mlflow_password }}@{{ postgres_host }}/{{ postgres_mlflow_db }}"

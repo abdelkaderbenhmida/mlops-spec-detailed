@@ -1,0 +1,13 @@
+---
+# Variables for the Kubernetes group (k8s-cp, k8s-wk1, k8s-wk2).
+k8s_version: "1.28.2"
+k8s_pod_network_cidr: "10.244.0.0/16"
+k8s_service_cidr: "10.96.0.0/12"
+k8s_cluster_name: mlops-cluster
+k8s_control_plane_ip: "{{ ips.k8s_cp }}"
+
+# Container runtime for kubeadm.
+cri: containerd
+
+# Flannel backend uses the pod network CIDR above (no overlay daemonsets needed).
+flannel_manifest_url: "https://raw.githubusercontent.com/flannel-io/flannel/v0.24.2/Documentation/kube-flannel.yml"

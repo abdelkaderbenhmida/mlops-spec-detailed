@@ -1,0 +1,13 @@
+---
+- name: Fetch join command from control plane
+  slurp:
+    src: /etc/kubernetes/join-command.sh
+  delegate_to: "{{ k8s_control_plane_ip }}"
+  register: join_slurp
+  become: true
+
+- name: Run kubeadm join
+  shell: "{{ (join_slurp.content | b64decode | trim) }} --ignore-preflight-errors=all"
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+  become: true

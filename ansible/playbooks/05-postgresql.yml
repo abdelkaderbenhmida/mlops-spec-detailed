@@ -1,0 +1,6 @@
+---
+- name: 05 - PostgreSQL (app DB + MLflow backend store)
+  hosts: postgres
+  gather_facts: true
+  roles:
+    - postgresql
