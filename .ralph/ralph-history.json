@@ -1200,16 +1200,32 @@
       "errors": [
         "\u001b[91m\u001b[1mError: \u001b[0mNo target in combo auto/coding supports tool calling; request carried 10 tools"
       ]
+    },
+    {
+      "iteration": 79,
+      "startedAt": "2026-08-15T19:08:44.163Z",
+      "endedAt": "2026-08-15T19:08:46.950Z",
+      "durationMs": 2677,
+      "agent": "opencode",
+      "model": "",
+      "toolsUsed": {},
+      "filesModified": [],
+      "exitCode": 1,
+      "completionDetected": false,
+      "errors": [
+        "\u001b[91m\u001b[1mError: \u001b[0m[401]: Model north-mini-code-free is not supported [oc/north-mini-code-free (401)]"
+      ]
     }
   ],
-  "totalDurationMs": 3756454,
+  "totalDurationMs": 3759131,
   "struggleIndicators": {
     "repeatedErrors": {
       "\u001b[91m\u001b[1mError: \u001b[0mStructurally heavy chat request capacity is busy; retry shortly.": 5,
       "\u001b[91m\u001b[1mError: \u001b[0mNo target in combo auto/coding supports tool calling; request carried 10 tools": 63,
-      "\u001b[91m\u001b[1mError: \u001b[0m{\"message\":\"[401]: Model north-mini-code-free is not supported [oc/north-mini-co": 1
+      "\u001b[91m\u001b[1mError: \u001b[0m{\"message\":\"[401]: Model north-mini-code-free is not supported [oc/north-mini-co": 1,
+      "\u001b[91m\u001b[1mError: \u001b[0m[401]: Model north-mini-code-free is not supported [oc/north-mini-code-free (401": 1
     },
-    "noProgressIterations": 69,
-    "shortIterations": 63
+    "noProgressIterations": 70,
+    "shortIterations": 64
   }
 }
