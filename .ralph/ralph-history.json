@@ -540,15 +540,30 @@
       "errors": [
         "\u001b[91m\u001b[1mError: \u001b[0mNo target in combo auto/coding supports tool calling; request carried 10 tools"
       ]
+    },
+    {
+      "iteration": 35,
+      "startedAt": "2026-08-15T19:06:05.620Z",
+      "endedAt": "2026-08-15T19:06:08.020Z",
+      "durationMs": 2290,
+      "agent": "opencode",
+      "model": "",
+      "toolsUsed": {},
+      "filesModified": [],
+      "exitCode": 1,
+      "completionDetected": false,
+      "errors": [
+        "\u001b[91m\u001b[1mError: \u001b[0mNo target in combo auto/coding supports tool calling; request carried 10 tools"
+      ]
     }
   ],
-  "totalDurationMs": 3653225,
+  "totalDurationMs": 3655515,
   "struggleIndicators": {
     "repeatedErrors": {
       "\u001b[91m\u001b[1mError: \u001b[0mStructurally heavy chat request capacity is busy; retry shortly.": 5,
-      "\u001b[91m\u001b[1mError: \u001b[0mNo target in combo auto/coding supports tool calling; request carried 10 tools": 20
+      "\u001b[91m\u001b[1mError: \u001b[0mNo target in combo auto/coding supports tool calling; request carried 10 tools": 21
     },
-    "noProgressIterations": 25,
-    "shortIterations": 19
+    "noProgressIterations": 26,
+    "shortIterations": 20
   }
 }
