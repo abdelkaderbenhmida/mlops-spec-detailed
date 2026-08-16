@@ -43,3 +43,6 @@ ansible/inventory/hosts.ini.local
 
 # Logs
 *.log
+
+# Ralph loop state
+.ralph/
