@@ -1,0 +1,87 @@
+pipeline {
+    agent { label 'mlops' }
+
+    environment {
+        MLFLOW_TRACKING_URI = 'http://10.0.2.30:5000'
+        MODEL_NAME           = 'churn-model'
+        IMAGE_NAME           = 'mlops-fastapi'
+        K8S_NS               = 'mlops'
+    }
+
+    options {
+        timestamps()
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Train') {
+            steps {
+                sh 'cicd/stages/train.sh'
+            }
+        }
+
+        stage('Register & Promote') {
+            input {
+                message 'Promote new model version to Production?'
+                ok 'Promote'
+                parameters {
+                    string(name: 'MODEL_VERSION', description: 'MLflow model version to promote')
+                }
+            }
+            steps {
+                script {
+                    sh "python3 -c \"from mlflow.tracking import MlflowClient; c=MlflowClient(); c.transition_model_version_stage('${MODEL_NAME}', ${params.MODEL_VERSION}, 'Production'); print('promoted')'\""
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'cicd/stages/test.sh'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'cicd/stages/build.sh'
+            }
+        }
+
+        stage('Push') {
+            steps {
+                script {
+                    def tag = sh(script: 'cat /tmp/mlops-image-tag.txt', returnStdout: true).trim()
+                    sh "docker push ${tag}"
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh 'cicd/stages/deploy.sh'
+            }
+        }
+
+        stage('Smoke test') {
+            steps {
+                sh 'scripts/smoke-test.sh'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline finished successfully.'
+        }
+        failure {
+            echo 'Pipeline failed.'
+        }
+    }
+}

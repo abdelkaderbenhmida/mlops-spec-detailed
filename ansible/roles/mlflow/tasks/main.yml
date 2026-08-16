@@ -1,0 +1,51 @@
+---
+- name: Ensure MLflow artifact directory exists
+  file:
+    path: "{{ mlflow_artifact_root }}"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0755"
+  become: true
+
+- name: Install MLflow and its Python dependencies
+  pip:
+    name:
+      - mlflow=={{ mlflow_version }}
+      - boto3
+      - psycopg2-binary
+      - pyyaml
+    state: present
+  become: true
+
+- name: Create MLflow systemd unit
+  copy:
+    dest: /etc/systemd/system/mlflow.service
+    content: |
+      [Unit]
+      Description=MLflow Tracking Server
+      After=network.target postgresql.service
+
+      [Service]
+      User={{ admin_user }}
+      Group={{ admin_user }}
+      ExecStart=/usr/bin/mlflow server \
+        --backend-store-uri {{ mlflow_backend_store_uri }} \
+        --default-artifact-root {{ mlflow_artifact_root }} \
+        --host 0.0.0.0 \
+        --port {{ mlflow_port }}
+      Restart=on-failure
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: "0644"
+  become: true
+
+- name: Start and enable MLflow
+  systemd:
+    name: mlflow
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true

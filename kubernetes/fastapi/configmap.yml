@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-config
+  namespace: mlops
+data:
+  MLFLOW_TRACKING_URI: "http://10.0.2.30:5000"
+  MODEL_NAME: "churn-model"
+  MODEL_STAGE: "Production"
+  DB_HOST: "10.0.2.40"
+  DB_PORT: "5432"
+  DB_NAME: "mlops"
+  PROMETHEUS_MULTIPROC_DIR: "/tmp"

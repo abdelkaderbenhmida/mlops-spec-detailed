@@ -1,0 +1,6 @@
+---
+- name: 06 - CI/CD server (Jenkins)
+  hosts: git-cicd
+  gather_facts: true
+  roles:
+    - cicd

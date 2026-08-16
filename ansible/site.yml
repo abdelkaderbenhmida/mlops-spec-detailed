@@ -1,0 +1,64 @@
+---
+# Site-wide configuration playbook: applies roles to the relevant groups.
+# Order matters: common/docker first, then the k8s cluster, stateful services,
+# and monitoring last (it depends on the rest emitting data).
+- name: Common base configuration (all hosts)
+  hosts: all
+  gather_facts: true
+  roles:
+    - common
+
+- name: Docker + Kubernetes
+  hosts: k8s
+  gather_facts: true
+  roles:
+    - docker
+    - k8s-common
+
+- name: Kubernetes control plane
+  hosts: k8s_masters
+  gather_facts: true
+  roles:
+    - k8s-control-plane
+
+- name: Kubernetes workers
+  hosts: k8s_workers
+  gather_facts: true
+  roles:
+    - k8s-worker
+
+- name: PostgreSQL (app DB + MLflow backend store)
+  hosts: postgres
+  gather_facts: true
+  roles:
+    - postgresql
+
+- name: MLflow tracking server + model registry
+  hosts: mlflow
+  gather_facts: true
+  roles:
+    - mlflow
+
+- name: CI/CD server (Jenkins)
+  hosts: git-cicd
+  gather_facts: true
+  roles:
+    - cicd
+
+- name: Prometheus server
+  hosts: prometheus
+  gather_facts: true
+  roles:
+    - prometheus
+
+- name: Grafana server
+  hosts: grafana
+  gather_facts: true
+  roles:
+    - grafana
+
+- name: Node exporters (all 12 VMs)
+  hosts: all
+  gather_facts: false
+  roles:
+    - node_exporter

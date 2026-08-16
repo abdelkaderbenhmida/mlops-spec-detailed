@@ -1,0 +1,50 @@
+groups:
+  - name: mlops-fastapi
+    rules:
+      # 5xx error rate > 5% over 5 minutes.
+      - alert: FastAPIHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_requests_total[5m])), 1)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FastAPI 5xx error rate above 5%"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5m."
+
+      # p95 latency above 500ms over 5 minutes.
+      - alert: FastAPIHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+            > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "FastAPI p95 latency above 500ms"
+          description: "p95 latency is {{ $value }}s over the last 5m."
+
+      # Prediction volume drop: near-zero /predict requests unexpectedly.
+      - alert: PredictionVolumeDrop
+        expr: |
+          sum(increase(http_requests_total{path="/predict"}[15m]))
+            < 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prediction volume dropped"
+          description: "Fewer than 5 /predict requests in the last 15m."
+
+      # /health reporting no model loaded for over 2 minutes.
+      - alert: NoModelLoaded
+        expr: |
+          fastapi_model_loaded == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No model loaded in FastAPI"
+          description: "The model flag has been 0 for over 2 minutes."

@@ -1,0 +1,71 @@
+---
+# Common base configuration for every VM.
+- name: Update apt cache
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Install base packages
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - wget
+      - git
+      - vim
+      - htop
+      - tree
+      - jq
+      - python3
+      - python3-pip
+      - python3-venv
+      - apt-transport-https
+      - gnupg
+      - software-properties-common
+      - ntp
+    state: present
+  become: true
+
+- name: Ensure admin user exists
+  user:
+    name: "{{ admin_user }}"
+    state: present
+    groups: sudo
+    append: true
+    shell: /bin/bash
+  become: true
+
+- name: Set hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+  become: true
+
+- name: Enable NTP
+  systemd:
+    name: ntp
+    enabled: true
+    state: started
+  become: true
+
+- name: Apply sysctl network hardening
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+  loop:
+    - {key: net.ipv4.conf.all.rp_filter, value: "1"}
+    - {key: net.ipv4.icmp_echo_ignore_broadcasts, value: "1"}
+    - {key: net.core.netdev_max_backlog, value: "16384"}
+  become: true
+
+- name: Write /etc/motd banner
+  copy:
+    dest: /etc/motd
+    content: |
+      Enterprise MLOps Platform
+      Host: {{ inventory_hostname }}
+      Managed by Ansible.
+      Unauthorized access prohibited.
+  become: true

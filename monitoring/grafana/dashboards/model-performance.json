@@ -1,0 +1,57 @@
+{
+  "dashboard": {
+    "title": "Model Performance",
+    "uid": "model-performance",
+    "tags": ["mlops", "model", "drift"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Prediction Count Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(increase(http_requests_total{path=\"/predict\"}[1m]))",
+            "legendFormat": "req/min"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "title": "Prediction Class Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by(prediction) (rate(predictions_total{prediction=~\"churn|no_churn\"}[5m]))",
+            "legendFormat": "{{prediction}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "title": "Average Prediction Probability",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "avg(predictions_probability_bucket)",
+            "legendFormat": "avg prob"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}
+      },
+      {
+        "title": "Model Version Serving",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "count by(model_version) (predictions_total)",
+            "legendFormat": "{{model_version}}",
+            "format": "table"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}
+      }
+    ],
+    "time": {"from": "now-6h", "to": "now"},
+    "refresh": "30s"
+  }
+}

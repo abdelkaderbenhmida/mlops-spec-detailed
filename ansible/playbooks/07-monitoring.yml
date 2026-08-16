@@ -1,0 +1,16 @@
+---
+- name: 07 - Monitoring stack (Prometheus + Grafana + node exporters)
+  hosts: all
+  gather_facts: false
+  roles:
+    - node_exporter
+- name: Prometheus server
+  hosts: prometheus
+  gather_facts: true
+  roles:
+    - prometheus
+- name: Grafana server
+  hosts: grafana
+  gather_facts: true
+  roles:
+    - grafana

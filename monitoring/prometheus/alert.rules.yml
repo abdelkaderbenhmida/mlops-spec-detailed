@@ -1,0 +1,69 @@
+groups:
+  - name: fastapi_alerts
+    rules:
+      - alert: FastAPIHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{job="fastapi",status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{job="fastapi"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'FastAPI 5xx error rate above 5%'
+          description: '5xx error rate is {{ $value | humanizePercentage }} over the last 5m.'
+
+      - alert: FastAPIHighLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="fastapi"}[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'FastAPI p95 latency above 500ms'
+          description: 'p95 latency is {{ $value }}s over the last 5m.'
+
+      - alert: PredictionVolumeDrop
+        expr: |
+          sum(rate(http_requests_total{job="fastapi",handler="/predict"}[10m])) < 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Prediction volume dropped to near zero'
+          description: 'No /predict traffic in the last 10 minutes - possible upstream integration failure.'
+
+  - name: model_alerts
+    rules:
+      - alert: NoModelLoaded
+        expr: |
+          min_over_time(mlops_model_loaded{job="fastapi"}[2m]) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'No model loaded in FastAPI'
+          description: 'The serving endpoint reports no model loaded for more than 2 minutes.'
+
+  - name: node_alerts
+    rules:
+      - alert: NodeDown
+        expr: up{job="node_exporter"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Node exporter target down'
+          description: '{{ $labels.instance }} has been unreachable for over 5 minutes.'
+
+      - alert: NodeHighCPU
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High CPU usage on {{ $labels.instance }}'
+          description: 'CPU usage is above 85% for more than 10 minutes.'

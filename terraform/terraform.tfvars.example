@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------------------
+# Example terraform.tfvars for the MLOps platform.
+# Copy to terraform.tfvars and fill in real values before running
+# `terraform init && terraform apply`.
+# ---------------------------------------------------------------------------
+
+project_id  = "your-gcp-project-id"
+region      = "europe-west1"
+zone        = "europe-west1-b"
+
+# Admin IP (CIDR) allowed SSH access via sg-mgmt. Set to your public IP.
+admin_ip     = "203.0.113.10/32"
+ssh_public_key = "~/.ssh/id_ed25519.pub"
+
+# Uncomment to pin the backend GCS bucket (otherwise pass at init time):
+# state_bucket = "your-tfstate-bucket"
+
+# Optional overrides:
+# enable_nat            = true
+# machine_type_default  = "e2-small"
+# boot_disk_image       = "ubuntu-2204-lts"
+# boot_disk_size_gb     = 30

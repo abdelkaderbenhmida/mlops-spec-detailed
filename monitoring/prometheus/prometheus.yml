@@ -1,0 +1,63 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: mlops
+    platform: mlops-platform
+
+rule_files:
+  - alert.rules.yml
+
+scrape_configs:
+  - job_name: node_exporter
+    static_configs:
+      - targets:
+          - '10.0.2.10:9100'   # ctrl-node
+          - '10.0.2.11:9100'   # git-cicd
+          - '10.0.2.20:9100'   # k8s-cp
+          - '10.0.2.21:9100'   # k8s-wk1
+          - '10.0.2.22:9100'   # k8s-wk2
+          - '10.0.2.30:9100'   # mlflow
+          - '10.0.2.31:9100'   # fastapi
+          - '10.0.2.40:9100'   # postgres
+          - '10.0.2.50:9100'   # prometheus
+          - '10.0.2.51:9100'   # grafana
+          - '10.0.2.60:9100'   # training-env
+          - '10.0.2.61:9100'   # testing-env
+
+  - job_name: kubernetes-nodes
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __address__
+        replacement: '10.0.2.20:10250'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_.*|kubelet_.*|machine_.*'
+        action: keep
+
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets: ['10.0.2.20:8080']
+
+  - job_name: cadvisor
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace]
+        regex: kube-system
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        regex: cadvisor
+        action: keep
+
+  - job_name: postgres_exporter
+    static_configs:
+      - targets: ['10.0.2.40:9187']
+
+  - job_name: fastapi
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - '10.0.2.31:8000'

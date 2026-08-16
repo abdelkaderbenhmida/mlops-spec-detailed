@@ -1,0 +1,95 @@
+---
+- name: Install Grafana prerequisites
+  apt:
+    name:
+      - apt-transport-https
+      - software-properties-common
+    state: present
+  become: true
+
+- name: Add Grafana apt key
+  apt_key:
+    url: https://apt.grafana.com/gpg.key
+    state: present
+  become: true
+
+- name: Add Grafana apt repository
+  apt_repository:
+    repo: "deb https://apt.grafana.com stable main"
+    state: present
+  become: true
+
+- name: Install Grafana
+  apt:
+    name: grafana
+    update_cache: true
+    state: present
+  become: true
+
+- name: Create Grafana provisioning directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: grafana
+    group: grafana
+  loop:
+    - /etc/grafana/provisioning/datasources
+    - /etc/grafana/provisioning/dashboards
+    - /var/lib/grafana/dashboards
+  become: true
+
+- name: Provision Prometheus datasource
+  copy:
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://{{ prometheus_host }}:9090
+          isDefault: true
+    mode: "0644"
+  become: true
+  notify: restart grafana
+
+- name: Provision dashboards provider
+  copy:
+    dest: /etc/grafana/provisioning/dashboards/dashboards.yml
+    content: |
+      apiVersion: 1
+      providers:
+        - name: "mlops"
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          updateIntervalSeconds: 30
+          options:
+            path: /var/lib/grafana/dashboards
+    mode: "0644"
+  become: true
+  notify: restart grafana
+
+- name: Install dashboard JSON files
+  copy:
+    src: "dashboards/{{ item }}"
+    dest: "/var/lib/grafana/dashboards/{{ item }}"
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  loop:
+    - node-exporter.json
+    - kubernetes-cluster.json
+    - fastapi-requests.json
+    - model-performance.json
+  become: true
+  notify: restart grafana
+
+- name: Start and enable Grafana
+  systemd:
+    name: grafana-server
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true

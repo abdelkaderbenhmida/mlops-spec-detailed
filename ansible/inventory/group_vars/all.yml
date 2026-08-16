@@ -1,0 +1,46 @@
+---
+# Variables shared by every host in the platform.
+admin_user: admin
+ssh_user: admin
+
+# IP plan from the spec section 2.
+ips:
+  ctrl_node: "10.0.2.10"
+  git_cicd: "10.0.2.11"
+  k8s_cp: "10.0.2.20"
+  k8s_wk1: "10.0.2.21"
+  k8s_wk2: "10.0.2.22"
+  mlflow: "10.0.2.30"
+  fastapi: "10.0.2.31"
+  postgres: "10.0.2.40"
+  prometheus: "10.0.2.50"
+  grafana: "10.0.2.51"
+  training: "10.0.2.60"
+  testing: "10.0.2.61"
+
+# PostgreSQL (VM08) used by the app AND as the MLflow backend store.
+postgres_host: "{{ ips.postgres }}"
+postgres_app_db: mlops
+postgres_app_user: mlops_app
+postgres_app_password: "changeme_app"
+postgres_mlflow_db: mlflow
+postgres_mlflow_user: mlflow
+postgres_mlflow_password: "changeme_mlflow"
+
+# MLflow tracking server (VM06).
+mlflow_host: "{{ ips.mlflow }}"
+mlflow_port: 5000
+mlflow_tracking_uri: "http://{{ mlflow_host }}:{{ mlflow_port }}"
+
+# Model registry contract used by FastAPI.
+model_name: churn-model
+model_stage: Production
+
+# Monitoring scrape config shared bits.
+prometheus_host: "{{ ips.prometheus }}"
+grafana_host: "{{ ips.grafana }}"
+node_exporter_port: 9100
+postgres_exporter_port: 9187
+
+# Docker mirrors / registries (override per environment if needed).
+docker_registry: ""

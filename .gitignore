@@ -1,1 +1,48 @@
-.worktrees/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform/terraform.tfvars.example
+crash.log
+
+# MLflow
+mlruns/
+mlartifacts/
+*.pkl
+
+# Local data / scratch
+ml/data/processed/*.csv
+ml/models/*
+!ml/models/.gitkeep
+
+# Env / secrets
+.env
+*.pem
+*.key
+
+# OS / editors
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Ansible
+ansible/inventory/hosts.ini.local
+*.retry
+
+# Logs
+*.log
+
+# Ralph loop state
+.ralph/
