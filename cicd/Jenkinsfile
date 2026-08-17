@@ -36,9 +36,18 @@ pipeline {
                 }
             }
             steps {
-                script {
-                    sh "python3 -c \"from mlflow.tracking import MlflowClient; c=MlflowClient(); c.transition_model_version_stage('${MODEL_NAME}', ${params.MODEL_VERSION}, 'Production'); print('promoted')'\""
-                }
+                sh """
+                    python3 - "${MODEL_NAME}" "${params.MODEL_VERSION}" <<'PROMOTE'
+import sys
+from mlflow.tracking import MlflowClient
+
+model_name, version = sys.argv[1], int(sys.argv[2])
+client = MlflowClient()
+client.transition_model_version_stage(model_name, version, "Production")
+client.update_model_version(model_name, version, description="Promoted via Jenkins approval gate")
+print(f"promoted {model_name} v{version} -> Production")
+PROMOTE
+                """
             }
         }
 

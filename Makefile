@@ -6,7 +6,7 @@ PYTHON ?= python3
 MLFLOW_URI ?= http://10.0.2.30:5000
 K8S_NS := mlops
 
-.PHONY: help init plan apply provision inventory configure bootstrap train evaluate promote build-image deploy-k8s smoke validate clean
+.PHONY: help init plan apply provision inventory configure bootstrap train evaluate promote test build-image deploy-k8s smoke validate clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
