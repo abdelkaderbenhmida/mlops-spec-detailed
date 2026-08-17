@@ -21,13 +21,17 @@ import mlflow.pyfunc
 import pandas as pd
 from sklearn.metrics import f1_score, roc_auc_score
 
-from preprocess import load_and_preprocess, load_config
-
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+
+ML_TRAINING_DIR = os.path.join(PROJECT_ROOT, "ml", "training")
+if ML_TRAINING_DIR not in sys.path:
+    sys.path.insert(0, ML_TRAINING_DIR)
+
+from preprocess import load_and_preprocess, load_config
 
 
 def _prediction_frame(model, X) -> tuple[list[str], list[float]]:
@@ -70,7 +74,8 @@ def main() -> None:
     mflow = config["mlflow"]
     econf = config["evaluation"]
 
-    mlflow.set_tracking_uri(mflow["tracking_uri"])
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mflow["tracking_uri"])
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(mflow["experiment_name"])
 
     _, X_test, _, y_test = load_and_preprocess(config=config)

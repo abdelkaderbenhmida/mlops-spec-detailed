@@ -93,7 +93,8 @@ def main() -> None:
     mflow = config["mlflow"]
     dconf = config["data"]
 
-    mlflow.set_tracking_uri(mflow["tracking_uri"])
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", mflow["tracking_uri"])
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(mflow["experiment_name"])
 
     X_train, X_test, y_train, y_test = load_and_preprocess(config=config)

@@ -42,7 +42,7 @@ async def health_check():
         db_connected=db_ok,
         model_loaded=model_ok,
         model_name=meta.get("name"),
-        model_version=meta.get("version"),
+        model_version=str(meta.get("version")),
         model_stage=meta.get("stage"),
     )
 

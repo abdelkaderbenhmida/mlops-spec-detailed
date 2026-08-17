@@ -46,7 +46,7 @@ async def predict(
     try:
         import pandas as pd
         df = pd.DataFrame([input_dict])
-        result = model.predict(None, df)
+        result = model.predict(df)
 
         prob = float(result["probability"].iloc[0])
         pred = str(result["prediction"].iloc[0])
@@ -86,6 +86,6 @@ async def predict(
     return PredictResponse(
         prediction=pred,
         probability=prob,
-        model_version=meta.get("version", "unknown"),
+        model_version=str(meta.get("version", "unknown")),
         model_stage=meta.get("stage", "unknown"),
     )

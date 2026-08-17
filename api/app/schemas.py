@@ -16,6 +16,7 @@ class PredictRequest(BaseModel):
 
     tenure_months: Optional[int] = Field(default=0, ge=0, le=100, alias="tenure")
     monthly_charges: Optional[float] = Field(default=50.0, ge=0, le=200)
+    total_charges: Optional[float] = Field(default=600.0, ge=0)
     contract_type: Optional[Literal["month-to-month", "one year", "two year"]] = Field(
         default="month-to-month", alias="contract"
     )

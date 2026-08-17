@@ -47,7 +47,7 @@ def _weighted_choice(options: list[str], probs: list[float]) -> str:
 
 def generate(n_rows: int = N_DEFAULTS) -> pd.DataFrame:
     rows: list[dict] = []
-    for _ in range(n_rows):
+    for i in range(n_rows):
         tenure = int(RNG.integers(0, 73))
         contract = _weighted_choice(CONTRACT_TYPES, [0.55, 0.24, 0.21])
         internet = _weighted_choice(INTERNET_SERVICES, [0.45, 0.44, 0.11])
