@@ -1,4 +1,4 @@
-"""Pydantic request/response models for the API."""
+"""Pydantic request/response models for the predictive maintenance API."""
 
 from __future__ import annotations
 
@@ -7,46 +7,32 @@ from typing import Any, Dict, Literal, Optional
 
 
 class PredictRequest(BaseModel):
-    """Churn prediction request body.
+    """Predictive maintenance prediction request.
 
-    All fields are optional (with sensible defaults for missing features).
-    The trained model uses OneHotEncoder(handle_unknown='ignore') so unseen
-    categories will be treated as zeros.
+    Equipment sensor data for failure prediction within 30 days.
     """
 
-    tenure_months: Optional[int] = Field(default=0, ge=0, le=100, alias="tenure")
-    monthly_charges: Optional[float] = Field(default=50.0, ge=0, le=200)
-    total_charges: Optional[float] = Field(default=600.0, ge=0)
-    contract_type: Optional[Literal["month-to-month", "one year", "two year"]] = Field(
-        default="month-to-month", alias="contract"
+    equipment_type: Literal["pump", "motor", "compressor", "turbine"] = Field(
+        default="pump", description="Type of industrial equipment"
     )
-    payment_method: Optional[Literal["electronic_check", "mailed_check", "bank_transfer", "credit_card"]] = Field(
-        default="electronic_check", alias="payment_method"
-    )
-    internet_service: Optional[Literal["DSL", "Fiber optic", "No"]] = Field(default="Fiber optic")
-    gender: Optional[Literal["Male", "Female"]] = Field(default="Male")
-    senior_citizen: Optional[int] = Field(default=0, ge=0, le=1)
-    partner: Optional[Literal["Yes", "No"]] = Field(default="No")
-    dependents: Optional[Literal["Yes", "No"]] = Field(default="No")
-    phone_service: Optional[Literal["Yes", "No"]] = Field(default="Yes")
-    multiple_lines: Optional[Literal["Yes", "No", "No phone service"]] = Field(default="No")
-    online_security: Optional[Literal["Yes", "No", "No internet service"]] = Field(default="No")
-    online_backup: Optional[Literal["Yes", "No", "No internet service"]] = Field(default="No")
-    device_protection: Optional[Literal["Yes", "No", "No internet service"]] = Field(default="No")
-    tech_support: Optional[Literal["Yes", "No", "No internet service"]] = Field(default="No")
-    streaming_tv: Optional[Literal["Yes", "No", "No internet service"]] = Field(default="No")
-    streaming_movies: Optional[Literal["Yes", "No", "No internet service"]] = Field(default="No")
-    paperless_billing: Optional[Literal["Yes", "No"]] = Field(default="Yes")
+    age_months: int = Field(default=60, ge=1, le=300, description="Equipment age in months")
+    operating_hours: float = Field(default=20000.0, ge=0, le=200000, description="Total operating hours")
+    maintenance_history: int = Field(default=5, ge=0, le=100, description="Number of past maintenance events")
+    sensor_temp: float = Field(default=70.0, ge=0, le=200, description="Temperature sensor reading (°C)")
+    sensor_vibration: float = Field(default=1.0, ge=0, le=15, description="Vibration level (mm/s RMS)")
+    sensor_pressure: float = Field(default=35.0, ge=0, le=100, description="Pressure sensor reading (bar)")
+    sensor_humidity: float = Field(default=50.0, ge=0, le=100, description="Humidity sensor reading (%)")
 
     class Config:
         populate_by_name = True
 
 
 class PredictResponse(BaseModel):
-    """Churn prediction response."""
+    """Predictive maintenance prediction response."""
 
-    prediction: Literal["churn", "no_churn"]
+    prediction: Literal["failure", "no_failure"]
     probability: float = Field(ge=0.0, le=1.0)
+    risk_level: str = Field(description="Risk tier: critical, high, medium, low")
     model_version: str
     model_stage: str
 

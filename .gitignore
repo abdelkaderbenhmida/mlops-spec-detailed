@@ -23,6 +23,7 @@ mlartifacts/
 
 # Local data / scratch
 ml/data/processed/*.csv
+ml/data/processed/*.joblib
 ml/models/*
 !ml/models/.gitkeep
 
@@ -46,3 +47,6 @@ ansible/inventory/hosts.ini.local
 
 # Ralph loop state
 .ralph/
+
+# Runtime database state
+predictions.db

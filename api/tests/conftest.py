@@ -1,10 +1,4 @@
-"""Shared pytest fixtures for the API test suite.
-
-The tests run without any external dependency: MLflow, PostgreSQL and the
-Prometheus scrape target are all stubbed out. That keeps the CI/CD ``test``
-stage (``cicd/stages/test.sh``) runnable on the testing VM (VM12) before the
-model has been promoted or the database has been provisioned.
-"""
+"""Shared pytest fixtures for the predictive maintenance API test suite."""
 
 from __future__ import annotations
 
@@ -12,22 +6,15 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+import numpy as np
 import pytest
 
-# The application is importable as ``app.*`` relative to the ``api/`` directory,
-# which is what the container's WORKDIR is set to in docker/fastapi/Dockerfile.
 API_DIR = Path(__file__).resolve().parents[1]
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 
 
 class FakeSession:
-    """Minimal stand-in for a SQLAlchemy session.
-
-    Records the objects that would have been persisted so tests can assert on
-    prediction logging without a live PostgreSQL instance.
-    """
-
     def __init__(self) -> None:
         self.added: list[Any] = []
         self.committed = False
@@ -47,31 +34,28 @@ class FakeSession:
 
 
 class FakeModel:
-    """Stub MLflow pyfunc model returning a fixed churn probability."""
+    """Stub model returning a fixed failure probability via predict_proba."""
 
-    def __init__(self, probability: float = 0.83, prediction: str = "churn") -> None:
-        self.probability = probability
-        self.prediction = prediction
+    def __init__(self, failure_prob: float = 0.75) -> None:
+        self.failure_prob = failure_prob
         self.last_input: Any = None
 
-    def predict(self, df):
+    def predict_proba(self, df):
         import pandas as pd
-
         self.last_input = df
-        return pd.DataFrame(
-            {
-                "prediction": [self.prediction] * len(df),
-                "probability": [self.probability] * len(df),
-            }
-        )
+        probs = np.array([[1 - self.failure_prob, self.failure_prob]] * len(df))
+        return probs
+
+    def predict(self, df):
+        return (self.predict_proba(df)[:, 1] >= 0.5).astype(int)
 
 
 LOADED_META: Dict[str, Any] = {
     "loaded": True,
-    "name": "churn-model",
-    "version": "7",
-    "stage": "Production",
-    "run_id": "0123456789abcdef0123456789abcdef",
+    "name": "maintenance-model",
+    "version": "11",
+    "stage": "Staging",
+    "run_id": "abcdef1234567890abcdef1234567890",
 }
 
 
@@ -87,9 +71,7 @@ def fake_model() -> FakeModel:
 
 @pytest.fixture
 def app_module(monkeypatch):
-    """Import ``main`` with the startup side effects neutralised."""
     import main as main_module
-
     monkeypatch.setattr(main_module, "init_db", lambda: None)
     monkeypatch.setattr(main_module, "load_model", lambda: None)
     return main_module
@@ -97,9 +79,7 @@ def app_module(monkeypatch):
 
 @pytest.fixture
 def client(app_module, fake_model, fake_session, monkeypatch):
-    """TestClient with a loaded model and a stubbed database."""
     from fastapi.testclient import TestClient
-
     from app import model_loader
     from app.routers import health as health_router
     from app.routers import predict as predict_router
@@ -116,9 +96,7 @@ def client(app_module, fake_model, fake_session, monkeypatch):
 
 @pytest.fixture
 def client_no_model(app_module, monkeypatch):
-    """TestClient where the model failed to load (degraded / 503 paths)."""
     from fastapi.testclient import TestClient
-
     from app import model_loader
     from app.routers import health as health_router
 
@@ -126,13 +104,7 @@ def client_no_model(app_module, monkeypatch):
     monkeypatch.setattr(
         model_loader,
         "_model_meta",
-        {
-            "loaded": False,
-            "name": "churn-model",
-            "version": None,
-            "stage": "Production",
-            "run_id": None,
-        },
+        {"loaded": False, "name": "maintenance-model", "version": None, "stage": "Staging", "run_id": None},
     )
     monkeypatch.setattr(health_router, "check_db", lambda: True)
 
@@ -143,25 +115,13 @@ def client_no_model(app_module, monkeypatch):
 
 @pytest.fixture
 def sample_payload() -> Dict[str, Any]:
-    """A valid /predict body matching the spec section 6 contract."""
     return {
-        "tenure_months": 12,
-        "monthly_charges": 70.5,
-        "total_charges": 846.0,
-        "contract_type": "month-to-month",
-        "payment_method": "electronic_check",
-        "internet_service": "Fiber optic",
-        "gender": "Female",
-        "senior_citizen": 0,
-        "partner": "No",
-        "dependents": "No",
-        "phone_service": "Yes",
-        "multiple_lines": "No",
-        "online_security": "No",
-        "online_backup": "No",
-        "device_protection": "No",
-        "tech_support": "No",
-        "streaming_tv": "No",
-        "streaming_movies": "No",
-        "paperless_billing": "Yes",
+        "equipment_type": "pump",
+        "age_months": 60,
+        "operating_hours": 20000.0,
+        "maintenance_history": 5,
+        "sensor_temp": 70.0,
+        "sensor_vibration": 1.0,
+        "sensor_pressure": 35.0,
+        "sensor_humidity": 50.0,
     }

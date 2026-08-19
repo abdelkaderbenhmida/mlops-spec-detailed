@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
 
 import mlflow.pyfunc
 
@@ -27,11 +26,11 @@ def _tracking_uri() -> str:
 
 
 def _model_name() -> str:
-    return os.getenv("MODEL_NAME", "churn-model")
+    return os.getenv("MODEL_NAME", "maintenance-model")
 
 
 def _model_stage() -> str:
-    return os.getenv("MODEL_STAGE", "Production")
+    return os.getenv("MODEL_STAGE", "Staging")
 
 
 def load_model() -> None:
@@ -68,7 +67,7 @@ def load_model() -> None:
             stage,
             run_id,
         )
-    except Exception as exc:  # noqa: BLE001 - keep server running even if model load fails
+    except Exception as exc:
         logger.exception("Failed to load model from MLflow: %s", exc)
         _model = None
         _model_meta = {

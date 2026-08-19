@@ -11,9 +11,9 @@ def test_health_healthy_when_db_and_model_ok(client):
     assert body["status"] == "healthy"
     assert body["db_connected"] is True
     assert body["model_loaded"] is True
-    assert body["model_name"] == "churn-model"
-    assert body["model_version"] == "7"
-    assert body["model_stage"] == "Production"
+    assert body["model_name"] == "maintenance-model"
+    assert body["model_version"] == "11"
+    assert body["model_stage"] == "Staging"
 
 
 def test_health_degraded_when_model_missing(client_no_model):
@@ -62,9 +62,9 @@ def test_model_info_returns_metadata(client):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["name"] == "churn-model"
-    assert body["version"] == "7"
-    assert body["stage"] == "Production"
+    assert body["name"] == "maintenance-model"
+    assert body["version"] == "11"
+    assert body["stage"] == "Staging"
     assert body["run_id"]
 
 

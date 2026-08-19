@@ -1,45 +1,34 @@
-# Configuration for the churn ML pipeline.
-# Loaded by ml/training/train.py, ml/training/preprocess.py,
-# ml/training/features.py and ml/evaluation/evaluate.py.
+# Configuration for the predictive maintenance ML pipeline.
+# Generated synthetic maintenance data (ml/data/raw/maintenance.csv).
 
 mlflow:
   tracking_uri: "http://10.0.2.30:5000"
-  experiment_name: "churn_prediction"
-  model_name: "churn-model"
+  experiment_name: "predictive_maintenance"
+  model_name: "maintenance-model"
   artifact_path: "model"
 
 data:
-  raw_path: "ml/data/raw/telco_churn.csv"
+  raw_path: "ml/data/raw/maintenance.csv"
   processed_dir: "ml/data/processed"
-  processed_file: "ml/data/processed/telco_churn_processed.csv"
+  processed_file: "ml/data/processed/maintenance_processed.csv"
+  encoders_file: "ml/data/processed/encoders.joblib"
   test_size: 0.2
   random_state: 42
-  target: "churn"
+  target: "failure_next_30_days"
 
 features:
   numeric:
-    - tenure
-    - monthly_charges
+    - age_months
+    - operating_hours
+    - maintenance_history
+    - sensor_temp
+    - sensor_vibration
+    - sensor_pressure
+    - sensor_humidity
   categorical:
-    - gender
-    - senior_citizen
-    - partner
-    - dependents
-    - phone_service
-    - multiple_lines
-    - internet_service
-    - online_security
-    - online_backup
-    - device_protection
-    - tech_support
-    - streaming_tv
-    - streaming_movies
-    - contract
-    - paperless_billing
-    - payment_method
+    - equipment_type
 
 model:
-  # RandomForestClassifier hyperparameters (logged to MLflow as params).
   n_estimators: 200
   max_depth: 12
   min_samples_split: 10
@@ -50,5 +39,4 @@ model:
 
 evaluation:
   probability_threshold: 0.5
-  # F1 must not regress by more than this vs current Production (spec section 9).
   max_f1_regression: 0.01

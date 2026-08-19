@@ -1,8 +1,6 @@
-"""Data loading, validation and preprocessing for the churn pipeline.
+"""Data loading, validation and preprocessing for the predictive maintenance pipeline.
 
-Spec section 5:
-  - schema check: expected columns, dtypes, null thresholds
-  - imputation, encoding, stratified train/test split
+Real AI4I 2020 data: equipment_type (L/M/H), sensor readings, binary failure target.
 """
 
 from __future__ import annotations
@@ -11,122 +9,72 @@ import logging
 import os
 from typing import Any
 
+import joblib
 import pandas as pd
 import yaml
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_COLUMNS = [
-    "customer_id",
-    "gender",
-    "senior_citizen",
-    "partner",
-    "dependents",
-    "tenure",
-    "phone_service",
-    "multiple_lines",
-    "internet_service",
-    "online_security",
-    "online_backup",
-    "device_protection",
-    "tech_support",
-    "streaming_tv",
-    "streaming_movies",
-    "contract",
-    "paperless_billing",
-    "payment_method",
-    "monthly_charges",
-    "total_charges",
-    "churn",
-]
-
-NUMERIC_COLUMNS = ["tenure", "monthly_charges", "total_charges"]
-
-# Maximum tolerated missing ratio per column (%).
-MAX_NULL_RATIO = 0.05
-
-# Options that encode "no internet service" for add-on services.
-NO_INTERNET_OPTIONS = ["No internet service", "No phone service"]
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yml")
 
 
-def load_config(config_path: str = "ml/training/config.yml") -> dict[str, Any]:
-    """Load the pipeline configuration file."""
-    with open(config_path, "r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+def load_config() -> dict:
+    with open(CONFIG_PATH) as f:
+        return yaml.safe_load(f)
+
+
+def load_raw(path: str | None = None) -> pd.DataFrame:
+    config = load_config()
+    path = path or config["data"]["raw_path"]
+    df = pd.read_csv(path)
+    logger.info("Loaded raw data: %s rows x %s cols from %s", len(df), len(df.columns), path)
+    return df
 
 
 def validate_schema(df: pd.DataFrame) -> None:
-    """Fail loudly when the raw data does not match the expected schema."""
-    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    config = load_config()
+    target = config["data"]["target"]
+    required = config["features"]["numeric"] + config["features"]["categorical"] + [target]
+    missing = [c for c in required if c not in df.columns]
     if missing:
-        raise ValueError(f"Missing expected columns: {missing}")
-
-    null_ratio = df.isnull().mean()
-    bad = null_ratio[null_ratio > MAX_NULL_RATIO]
-    if not bad.empty:
-        raise ValueError(
-            f"Columns exceed {MAX_NULL_RATIO:.0%} null threshold: "
-            f"{dict(bad)}"
-        )
-
-    if df["churn"].nunique() < 2:
-        raise ValueError("Target column 'churn' has fewer than 2 classes.")
-
-    logger.info(
-        "Schema OK: %d columns, %d rows, churn rate %.1f%%",
-        df.shape[1],
-        len(df),
-        100 * (df["churn"] == "Yes").mean(),
-    )
+        raise ValueError(f"Missing columns: {missing}")
+    logger.info("Schema validation passed")
 
 
 def impute(df: pd.DataFrame) -> pd.DataFrame:
-    """Impute missing values: median for numerics, mode for categoricals."""
-    out = df.copy()
-    for col in NUMERIC_COLUMNS:
-        if col in out.columns and out[col].isnull().any():
-            median = pd.to_numeric(out[col], errors="coerce").median()
-            out[col] = out[col].replace("", pd.NA)
-            out[col] = pd.to_numeric(out[col], errors="coerce").fillna(median)
-    for col in out.select_dtypes(include=["object"]).columns:
-        if out[col].isnull().any():
-            out[col] = out[col].fillna(out[col].mode().iloc[0])
-    return out
-
-
-def normalize_categories(df: pd.DataFrame) -> pd.DataFrame:
-    """Collapse 'No internet service' / 'No phone service' to a shared code."""
-    out = df.copy()
-    for col in out.columns:
-        if col in NO_INTERNET_OPTIONS:
-            continue
-        out[col] = out[col].replace(NO_INTERNET_OPTIONS, "No")
-    # total_charges may contain empty strings in some exports.
-    out["total_charges"] = pd.to_numeric(out["total_charges"], errors="coerce")
-    return out
+    for col in df.select_dtypes(include="number").columns:
+        df[col] = df[col].fillna(df[col].median())
+    for col in df.select_dtypes(include="object").columns:
+        df[col] = df[col].fillna("unknown")
+    return df
 
 
 def encode_target(df: pd.DataFrame) -> pd.DataFrame:
-    """Map churn Yes/No to 1/0."""
-    out = df.copy()
-    out["churn"] = out["churn"].map({"Yes": 1, "No": 0})
-    return out
+    config = load_config()
+    target = config["data"]["target"]
+    df[target] = df[target].astype(int)
+    return df
+
+
+def normalize_categories(df: pd.DataFrame) -> pd.DataFrame:
+    for col in df.select_dtypes(include="object").columns:
+        df[col] = df[col].str.strip().str.upper()
+    return df
 
 
 def load_and_preprocess(
     raw_path: str | None = None,
     config: dict[str, Any] | None = None,
     save_processed: str | None = None,
-) -> tuple[pd.DataFrame, pd.Series, pd.Series, pd.Series]:
-    """Load the raw CSV, validate, clean and return stratified splits.
-
-    Returns (X_train, X_test, y_train, y_test).
-    """
+    save_encoders: str | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     config = config or load_config()
     raw_path = raw_path or config["data"]["raw_path"]
     test_size = config["data"]["test_size"]
     random_state = config["data"]["random_state"]
+    target = config["data"]["target"]
 
     df = pd.read_csv(raw_path)
     validate_schema(df)
@@ -134,34 +82,59 @@ def load_and_preprocess(
     df = impute(df)
     df = encode_target(df)
 
-    # Feature frame for training (drops id, keeps target out of X).
-    X = df.drop(columns=["customer_id", "churn"])
-    y = df["churn"]
+    feature_cols = config["features"]["numeric"] + config["features"]["categorical"]
+    X = df[feature_cols]
+    y = df[target]
+
+    encoders = {}
+    for col in X.select_dtypes(include="object").columns:
+        le = LabelEncoder()
+        X[col] = le.fit_transform(X[col].astype(str))
+        encoders[col] = le
+        logger.info("Encoded categorical: %s -> %d classes", col, len(le.classes_))
+
+    scaler = StandardScaler()
+    numeric_cols = X.select_dtypes(include="number").columns.tolist()
+    X[numeric_cols] = scaler.fit_transform(X[numeric_cols])
+    encoders["scaler"] = scaler
+    encoders["numeric_cols"] = numeric_cols
+
+    y = df[target]
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=test_size,
-        random_state=random_state,
-        stratify=y,
+        X, y, test_size=test_size, random_state=random_state, stratify=y,
     )
 
     if save_processed:
         os.makedirs(os.path.dirname(save_processed), exist_ok=True)
-        X_train.assign(churn=y_train).to_csv(save_processed, index=False)
+        X_train.assign(**{target: y_train}).to_csv(save_processed, index=False)
         logger.info("Wrote processed train split -> %s", save_processed)
 
-    logger.info(
-        "Train=%d Test=%d (test_size=%.2f)",
-        len(X_train),
-        len(X_test),
-        test_size,
-    )
+    if save_encoders:
+        os.makedirs(os.path.dirname(save_encoders), exist_ok=True)
+        joblib.dump(encoders, save_encoders)
+        logger.info("Saved encoders -> %s", save_encoders)
+
+    logger.info("Train=%d Test=%d", len(X_train), len(X_test))
     return X_train, X_test, y_train, y_test
+
+
+def transform_new_data(df: pd.DataFrame, encoders_path: str) -> pd.DataFrame:
+    encoders = joblib.load(encoders_path)
+    df = df.copy()
+
+    for col in df.select_dtypes(include="object").columns:
+        if col in encoders and isinstance(encoders[col], LabelEncoder):
+            le = encoders[col]
+            df[col] = df[col].astype(str).map(lambda x: le.transform([x])[0] if x in le.classes_ else -1)
+
+    numeric_cols = encoders.get("numeric_cols", [])
+    if numeric_cols and "scaler" in encoders:
+        df[numeric_cols] = encoders["scaler"].transform(df[numeric_cols])
+
+    return df
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    cfg = load_config()
-    X_tr, X_te, y_tr, y_te = load_and_preprocess(config=cfg)
-    print(f"X_train: {X_tr.shape}, y_train positive: {int(y_tr.sum())}")
+    load_and_preprocess()

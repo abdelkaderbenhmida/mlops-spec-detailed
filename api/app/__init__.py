@@ -1,1 +1,1 @@
-"""app package: FastAPI application for the churn prediction service."""
+"""app package: FastAPI application for the predictive maintenance prediction service."""
