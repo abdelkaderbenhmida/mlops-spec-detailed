@@ -1,6 +1,5 @@
-# Reproducible training image (VM11 / CI train stage).
-# Pinned Python + libraries so a retrain is deterministic.
-FROM python:3.10-slim
+# GPU training image (local). Base on NVIDIA CUDA runtime so XGBoost/gpu_hist works.
+FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -8,12 +7,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /workspace
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    python3 \
+    python3-pip \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir \
+RUN pip3 install --no-cache-dir \
     mlflow==2.7.1 \
+    xgboost \
     scikit-learn==1.3.2 \
     pandas==2.1.4 \
     numpy==1.26.3 \
@@ -21,4 +22,4 @@ RUN pip install --no-cache-dir \
 
 COPY ml/ ./ml/
 
-ENTRYPOINT ["python", "ml/training/train.py"]
+ENTRYPOINT ["python3", "ml/training/train.py"]

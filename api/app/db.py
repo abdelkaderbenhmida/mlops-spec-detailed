@@ -1,3 +1,6 @@
+# TODO: medium - Add type hints where missing
+# TODO: low - Add comprehensive docstring
+# TODO: low - Add error handling for edge cases
 """Database layer for prediction logging (SQLite-compatible)."""
 
 from __future__ import annotations
@@ -45,7 +48,7 @@ def _database_url() -> str:
     if os.getenv("DB_HOST"):
         user = os.getenv("DB_USER", "mlops_app")
         password = os.getenv("DB_PASSWORD", "changeme_app")
-        host = os.getenv("DB_HOST", "10.0.2.40")
+        host = os.getenv("DB_HOST", "localhost")
         port = os.getenv("DB_PORT", "5432")
         name = os.getenv("DB_NAME", "mlops")
         return f"postgresql://{user}:{password}@{host}:{port}/{name}"

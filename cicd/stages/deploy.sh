@@ -2,7 +2,7 @@
 # CI/CD stage: deploy the FastAPI image to Kubernetes and force reload of the Production model.
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 IMAGE_NAME="${IMAGE_NAME:-mlops-fastapi}"

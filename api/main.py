@@ -1,3 +1,6 @@
+# TODO: high - Add request validation and error handling
+# TODO: medium - Implement request/response logging
+# TODO: low - Add health check endpoint improvement
 """FastAPI application entrypoint.
 
 Exposes:

@@ -1,8 +1,13 @@
-"""Feature engineering for the Telco churn pipeline.
+# TODO: high - Add data validation before training
+# TODO: medium - Implement hyperparameter logging
+# TODO: low - Add model explainability integration
+"""Feature engineering for the predictive maintenance pipeline.
 
 Builds the sklearn feature preprocessor used both by training and evaluation.
 The pipeline one-hot encodes categoricals (handle_unknown='ignore' so the
 serving layer can send unseen values safely) and passes numerics through.
+Column lists come from ml/training/config.yml (numeric + categorical); the
+preprocessor is schema-agnostic.
 """
 
 from __future__ import annotations

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# TODO: medium - Add type hints where missing
+# TODO: low - Add comprehensive docstring
+# TODO: low - Add error handling for edge cases
 """Generate a realistic synthetic Telco Customer Churn dataset.
 
 Produces ~7,000 rows with the standard Telco churn schema (numeric + categorical

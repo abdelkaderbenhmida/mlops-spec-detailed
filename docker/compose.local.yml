@@ -1,0 +1,76 @@
+# Local GPU stack: MLflow + Postgres + training + FastAPI serving.
+# No Azure. Everything runs on the local GPU host.
+services:
+  postgres:
+    image: postgres:16
+    container_name: mlops-local-postgres
+    environment:
+      POSTGRES_USER: mlops
+      POSTGRES_PASSWORD: mlops
+      POSTGRES_DB: mlops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlops -d mlops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mlflow:
+    build:
+      context: ../docker/mlflow
+    container_name: mlops-local-mlflow
+    command: ["--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "postgresql://mlops:mlops@postgres:5432/mlops", "--default-artifact-root", "file:///opt/mlflow/artifacts"]
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-artifacts:/opt/mlflow/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  train:
+    profiles: ["train"]
+    build:
+      context: ../
+      dockerfile: docker/training/Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./../ml:/workspace/ml:ro
+    depends_on:
+      - mlflow
+
+  api:
+    profiles: ["serve"]
+    build:
+      context: ../api
+      dockerfile: ../docker/fastapi/Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DB_HOST: localhost
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mlflow
+      - postgres
+
+volumes:
+  pg-data:
+  mlflow-artifacts:

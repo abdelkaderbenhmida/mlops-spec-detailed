@@ -8,10 +8,10 @@
 # before the promotion approval gate is offered.
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
-export MLFLOW_TRACKING_URI="${MLFLOW_TRACKING_URI:-http://10.0.2.30:5000}"
+export MLFLOW_TRACKING_URI="${MLFLOW_TRACKING_URI:-http://localhost:5000}"
 
 echo "== training and registering model =="
 python3 ml/training/train.py

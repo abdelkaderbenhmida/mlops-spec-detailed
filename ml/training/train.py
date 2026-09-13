@@ -1,3 +1,6 @@
+# TODO: high - Add data validation before training
+# TODO: medium - Implement hyperparameter logging
+# TODO: low - Add model explainability integration
 """Train a predictive maintenance model on real AI4I 2020 data and log it to MLflow.
 
 Steps:
@@ -15,7 +18,7 @@ import os
 import sys
 
 import mlflow
-import mlflow.sklearn
+import mlflow.xgboost
 import numpy as np
 
 from preprocess import load_and_preprocess, load_config
@@ -41,18 +44,22 @@ def train_and_log(
         save_encoders=config["data"]["encoders_file"],
     )
 
+    import numpy as np
+    from xgboost import XGBClassifier
+
+    pos_weight = float(np.sum(y_train == 0) / max(np.sum(y_train == 1), 1))
+
     params = {
         "n_estimators": config["model"]["n_estimators"],
         "max_depth": config["model"]["max_depth"],
-        "min_samples_split": config["model"]["min_samples_split"],
-        "min_samples_leaf": config["model"]["min_samples_leaf"],
-        "max_features": config["model"]["max_features"],
-        "class_weight": config["model"]["class_weight"],
+        "min_child_weight": 10,
+        "colsample_bytree": 0.8,
+        "scale_pos_weight": pos_weight,
         "random_state": 42,
         "n_jobs": config["model"]["n_jobs"],
+        "device": "cuda",
+        "tree_method": "hist",
     }
-
-    from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import (
         classification_report,
         f1_score,
@@ -61,7 +68,7 @@ def train_and_log(
         roc_auc_score,
     )
 
-    clf = RandomForestClassifier(**params)
+    clf = XGBClassifier(**params)
     clf.fit(X_train, y_train)
 
     proba = clf.predict_proba(X_test)[:, 1]
@@ -85,7 +92,7 @@ def train_and_log(
             "failure_rate": f"{y_train.mean():.4f}",
         })
         mlflow.log_metrics(metrics)
-        mlflow.sklearn.log_model(clf, config["mlflow"]["artifact_path"])
+        mlflow.xgboost.log_model(clf, config["mlflow"]["artifact_path"])
 
         if register:
             model_uri = f"runs:/{run.info.run_id}/{config['mlflow']['artifact_path']}"

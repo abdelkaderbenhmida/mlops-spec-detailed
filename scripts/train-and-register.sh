@@ -4,8 +4,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="${PYTHON:-python3}"
-MLFLOW_URI="${MLFLOW_TRACKING_URI:-http://10.0.2.30:5000}"
-MODEL_NAME="${MODEL_NAME:-churn-model}"
+MLFLOW_URI="${MLFLOW_TRACKING_URI:-http://localhost:5000}"
+MODEL_NAME="${MODEL_NAME:-maintenance-model}"
 PROMOTE=0
 
 usage() {

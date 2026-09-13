@@ -1,3 +1,6 @@
+# TODO: medium - Add type hints where missing
+# TODO: low - Add comprehensive docstring
+# TODO: low - Add error handling for edge cases
 """Shared pytest fixtures for the predictive maintenance API test suite."""
 
 from __future__ import annotations

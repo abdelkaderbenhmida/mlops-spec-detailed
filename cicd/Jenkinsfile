@@ -3,9 +3,10 @@ pipeline {
 
     environment {
         MLFLOW_TRACKING_URI = 'http://10.0.2.30:5000'
-        MODEL_NAME           = 'churn-model'
-        IMAGE_NAME           = 'mlops-fastapi'
-        K8S_NS               = 'mlops'
+        MLFLOW_MODEL_NAME   = 'maintenance-model'
+        MODEL_NAME          = 'maintenance-model'
+        IMAGE_NAME          = 'mlops-fastapi'
+        K8S_NS              = 'mlops'
     }
 
     options {
@@ -21,9 +22,39 @@ pipeline {
             }
         }
 
+        stage('Test') {
+            steps {
+                sh 'cicd/stages/test.sh'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'cicd/stages/build.sh'
+            }
+        }
+
+        stage('Push') {
+            steps {
+                script {
+                    def tag = sh(script: 'cat /tmp/mlops-image-tag.txt', returnStdout: true).trim()
+                    sh "docker push ${tag}"
+                }
+            }
+        }
+
         stage('Train') {
             steps {
                 sh 'cicd/stages/train.sh'
+            }
+        }
+
+        stage('Drift & Retrain') {
+            steps {
+                // Detect data drift vs reference; auto-retrain + re-evaluate
+                // when the drift score exceeds the threshold.
+                sh 'python3 ml/monitoring/drift_detector.py'
+                sh 'python3 -m ml.monitoring.retraining_trigger'
             }
         }
 
@@ -48,27 +79,6 @@ client.update_model_version(model_name, version, description="Promoted via Jenki
 print(f"promoted {model_name} v{version} -> Production")
 PROMOTE
                 """
-            }
-        }
-
-        stage('Test') {
-            steps {
-                sh 'cicd/stages/test.sh'
-            }
-        }
-
-        stage('Build') {
-            steps {
-                sh 'cicd/stages/build.sh'
-            }
-        }
-
-        stage('Push') {
-            steps {
-                script {
-                    def tag = sh(script: 'cat /tmp/mlops-image-tag.txt', returnStdout: true).trim()
-                    sh "docker push ${tag}"
-                }
             }
         }
 

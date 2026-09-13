@@ -40,7 +40,7 @@
 
 - name: Install Prometheus configuration
   copy:
-    src: prometheus.yml
+    src: "{{ prometheus_config_src }}"
     dest: /etc/prometheus/prometheus.yml
     owner: prometheus
     group: prometheus
@@ -50,8 +50,8 @@
 
 - name: Install alert rules
   copy:
-    src: alert.rules.yml
-    dest: /etc/prometheus/rules/alert.rules.yml
+    src: "{{ prometheus_rules_src }}"
+    dest: "{{ prometheus_rules_dest }}"
     owner: prometheus
     group: prometheus
     mode: "0644"

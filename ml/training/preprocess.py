@@ -1,3 +1,6 @@
+# TODO: high - Add data validation before training
+# TODO: medium - Implement hyperparameter logging
+# TODO: low - Add model explainability integration
 """Data loading, validation and preprocessing for the predictive maintenance pipeline.
 
 Real AI4I 2020 data: equipment_type (L/M/H), sensor readings, binary failure target.

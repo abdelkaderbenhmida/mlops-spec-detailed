@@ -3,13 +3,25 @@ TF_DIR := terraform
 ANSIBLE_DIR := ansible
 INV := $(ANSIBLE_DIR)/inventory/hosts.ini
 PYTHON ?= python3
-MLFLOW_URI ?= http://10.0.2.30:5000
+MLFLOW_URI ?= http://localhost:5000
 K8S_NS := mlops
 
-.PHONY: help init plan apply provision inventory configure bootstrap train evaluate promote test build-image deploy-k8s smoke validate clean
+.PHONY: help init plan apply provision inventory configure bootstrap train evaluate promote test build-image deploy-k8s smoke validate clean local-up local-down train-gpu serve-gpu
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+local-up: ## start local GPU stack (MLflow + Postgres) via docker compose
+	docker compose -f docker/compose.local.yml up -d
+
+local-down: ## stop local GPU stack
+	docker compose -f docker/compose.local.yml down
+
+train-gpu: ## train on local GPU (XGBoost gpu_hist) and log to local MLflow
+	MLFLOW_TRACKING_URI=$(MLFLOW_URI) $(PYTHON) ml/training/train.py
+
+serve-gpu: ## serve the model locally on GPU (FastAPI, XGBoost GPU predict)
+	MLFLOW_TRACKING_URI=$(MLFLOW_URI) $(PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8000 --app-dir api
 
 init: ## terraform init
 	cd $(TF_DIR) && terraform init
@@ -55,7 +67,7 @@ validate: ## static validation: python compile + yaml/json lint + terraform + an
 	@echo "== py_compile =="
 	@find . -name '*.py' -not -path './.git/*' -not -path './.terraform/*' -print0 | xargs -0 $(PYTHON) -m py_compile
 	@echo "== yaml lint =="
-	@$(PYTHON) -c "import glob,yaml,sys; [yaml.safe_load(open(f)) for f in glob.glob('**/*.yml', recursive=True)+glob.glob('**/*.yaml', recursive=True)]; print('ok')"
+	@$(PYTHON) -c "import glob,yaml,sys; [list(yaml.safe_load_all(open(f))) for f in glob.glob('**/*.yml', recursive=True)+glob.glob('**/*.yaml', recursive=True)]; print('ok')"
 	@echo "== json lint =="
 	@$(PYTHON) -c "import glob,json,sys; [json.load(open(f)) for f in glob.glob('**/*.json', recursive=True)]; print('ok')"
 	@echo "== terraform validate =="
@@ -67,3 +79,4 @@ clean: ## remove generated artifacts
 	rm -rf mlruns mlartifacts
 	rm -rf $(TF_DIR)/.terraform $(TF_DIR)/tf.plan
 	find . -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
+

@@ -1,3 +1,6 @@
+# TODO: medium - Add type hints where missing
+# TODO: low - Add comprehensive docstring
+# TODO: low - Add error handling for edge cases
 """Prediction router for predictive maintenance."""
 
 from __future__ import annotations
@@ -53,8 +56,24 @@ async def predict(
     input_dict = request.model_dump()
 
     try:
+        import os
         import pandas as pd
+        import sys
+
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "ml", "training"))
+        from preprocess import transform_new_data
+        from app.db import _database_url  # noqa: F401  (ensure project root importable)
+
         df = pd.DataFrame([input_dict])
+        encoders_path = os.environ.get(
+            "ENCODERS_PATH",
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "ml", "data", "processed", "encoders.joblib"),
+        )
+        df = transform_new_data(df, encoders_path)
+        if hasattr(model, "feature_names_in_"):
+            df = df[list(model.feature_names_in_)]
+        elif hasattr(model, "_model_meta"):
+            df = df[list(model._model_meta.get_inputs().names)]
 
         proba = model.predict_proba(df)
         prob = float(proba[0][1])

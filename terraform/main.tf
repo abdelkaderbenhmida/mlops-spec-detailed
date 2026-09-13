@@ -23,13 +23,13 @@ module "network" {
 module "security_groups" {
   source = "./modules/security-groups"
 
-  network_id         = module.network.network_id
-  private_cidr       = var.private_subnet_cidr
-  admin_ip           = var.admin_ip
-  mgmt_tags         = ["mgmt"]
-  internal_tags     = ["mgmt"]
-  k8s_tags          = ["k8s"]
-  public_tags       = ["public"]
+  network_id    = module.network.network_id
+  private_cidr  = var.private_subnet_cidr
+  admin_ip      = var.admin_ip
+  mgmt_tags     = ["mgmt"]
+  internal_tags = ["mgmt"]
+  k8s_tags      = ["k8s"]
+  public_tags   = ["public"]
 }
 
 # ---------------------------------------------------------------------------
@@ -38,14 +38,14 @@ module "security_groups" {
 module "compute" {
   source = "./modules/compute"
 
-  project_id        = var.project_id
-  region            = var.region
-  zone              = var.zone
-  network_id        = module.network.network_id
-  subnetwork_id     = module.network.private_subnet_id
-  ssh_public_key    = var.ssh_public_key
-  instances         = var.instances
+  project_id           = var.project_id
+  region               = var.region
+  zone                 = var.zone
+  network_id           = module.network.network_id
+  subnetwork_id        = module.network.private_subnet_id
+  ssh_public_key       = var.ssh_public_key
+  instances            = var.instances
   machine_type_default = var.machine_type_default
-  boot_disk_image   = var.boot_disk_image
-  boot_disk_size_gb = var.boot_disk_size_gb
+  boot_disk_image      = var.boot_disk_image
+  boot_disk_size_gb    = var.boot_disk_size_gb
 }

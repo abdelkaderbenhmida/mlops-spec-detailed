@@ -6,7 +6,7 @@ global:
     platform: mlops-platform
 
 rule_files:
-  - alert.rules.yml
+  - /etc/prometheus/rules/alert.rules.yml
 
 scrape_configs:
   - job_name: node_exporter

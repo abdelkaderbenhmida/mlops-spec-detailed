@@ -2,7 +2,7 @@
 # Generated synthetic maintenance data (ml/data/raw/maintenance.csv).
 
 mlflow:
-  tracking_uri: "http://10.0.2.30:5000"
+  tracking_uri: "http://localhost:5000"
   experiment_name: "predictive_maintenance"
   model_name: "maintenance-model"
   artifact_path: "model"

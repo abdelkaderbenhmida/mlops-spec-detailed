@@ -1,3 +1,6 @@
+# TODO: medium - Add type hints where missing
+# TODO: low - Add comprehensive docstring
+# TODO: low - Add error handling for edge cases
 """Tests for GET /health and GET /model-info (spec section 6)."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# TODO: medium - Add type hints where missing
+# TODO: low - Add comprehensive docstring
+# TODO: low - Add error handling for edge cases
 """Model loader - loads the model from MLflow Model Registry on startup."""
 
 from __future__ import annotations
@@ -22,7 +25,7 @@ _model_meta = {
 
 
 def _tracking_uri() -> str:
-    return os.getenv("MLFLOW_TRACKING_URI", "http://10.0.2.30:5000")
+    return os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
 
 def _model_name() -> str:
@@ -45,7 +48,10 @@ def load_model() -> None:
 
     try:
         mlflow.set_tracking_uri(tracking)
-        model = mlflow.pyfunc.load_model(f"models:/{name}/{stage}")
+        try:
+            model = mlflow.xgboost.load_model(f"models:/{name}/{stage}")
+        except Exception:
+            model = mlflow.pyfunc.load_model(f"models:/{name}/{stage}")
 
         _model = model
         client = mlflow.tracking.MlflowClient()

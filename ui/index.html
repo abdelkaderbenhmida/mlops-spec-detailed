@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predictive Maintenance — MLOps Platform</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#334155;--accent:#059669;--accent-strong:#047857;--accent-hover:#065F46;
+  --bg:#F8FAFC;--fg:#0F172A;--card:#FFFFFF;--muted:#F2F3F4;--muted-fg:#475569;
+  --border:#E6E8EA;--destructive:#DC2626;--warning:#D97706;--high:#EA580C;
+  --radius:10px;--shadow:0 1px 2px rgba(15,23,42,.06);--shadow-md:0 4px 14px rgba(15,23,42,.09);
+  --sidebar-w:236px;--topbar-h:60px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Fira Sans',sans-serif;background:var(--bg);color:var(--fg);line-height:1.5;min-height:100vh;font-size:14px}
+button{font-family:'Fira Sans',sans-serif}
+a{color:var(--accent-strong)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:'Fira Code',monospace}
+
+/* ---------- layout ---------- */
+.sidebar{position:fixed;inset:0 auto 0 0;width:var(--sidebar-w);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:50;transition:transform .25s ease}
+.brand{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border)}
+.brand-logo{width:36px;height:36px;border-radius:9px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.brand-text{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.brand-text strong{font-size:14px;font-weight:700}
+.brand-text small{font-size:11px;color:var(--muted-fg);letter-spacing:.04em}
+.side-nav{flex:1;padding:14px 12px;display:flex;flex-direction:column;gap:4px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;color:var(--muted-fg);font-size:14px;font-weight:500;text-decoration:none;cursor:pointer;transition:background-color .2s,color .2s;white-space:nowrap}
+.nav-item svg{flex:none}
+.nav-item:hover{background:var(--muted);color:var(--fg)}
+.nav-item.active{background:rgba(5,150,105,.10);color:var(--accent-strong);font-weight:600}
+.side-foot{padding:14px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-fg);display:flex;flex-direction:column;gap:6px}
+.side-foot .row{display:flex;align-items:center;gap:8px}
+
+.main{margin-left:var(--sidebar-w);min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;height:var(--topbar-h);background:rgba(248,250,252,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 24px}
+.topbar h2{font-size:17px;font-weight:600;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-btn{display:none}
+.top-actions{display:flex;align-items:center;gap:14px}
+.health{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-fg);font-family:'Fira Code',monospace}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.dot.ok{background:#22c55e}.dot.warn{background:#eab308}.dot.err{background:var(--destructive)}
+.icon-btn{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--card);color:var(--muted-fg);border-radius:8px;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s}
+.icon-btn:hover{background:var(--muted);color:var(--fg)}
+
+.content{flex:1;padding:24px;max-width:1440px;width:100%;margin:0 auto}
+.page{display:none}
+.page.active{display:block;animation:pageIn .22s ease}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:40}
+
+/* ---------- shared components ---------- */
+.grid{display:grid;gap:16px}
+.g-kpi{grid-template-columns:repeat(4,1fr)}
+.g-2{grid-template-columns:1fr 1fr}
+.g-3{grid-template-columns:1.4fr 1fr}
+.g-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:1200px){.g-kpi,.g-4{grid-template-columns:repeat(2,1fr)}.g-3{grid-template-columns:1fr}}
+@media(max-width:1024px){.g-2{grid-template-columns:1fr}}
+@media(max-width:768px){.g-kpi,.g-4{grid-template-columns:1fr}}
+@media(max-width:640px){.content{padding:16px}}
+
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;min-width:0}
+.panel>h3{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.panel>h3 svg{flex:none;color:var(--accent)}
+.chart-box{position:relative;height:280px}
+
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;display:flex;flex-direction:column;gap:4px;transition:box-shadow .2s,transform .2s}
+.kpi:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.k-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-fg)}
+.k-value{font-family:'Fira Code',monospace;font-size:30px;font-weight:700;line-height:1.15}
+.k-sub{font-size:12px;color:var(--muted-fg)}
+.k-value.ok{color:var(--accent-strong)}
+.k-value.bad{color:var(--destructive)}
+.k-value.warn{color:var(--warning)}
+.k-value.acc{color:var(--accent-strong)}
+
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.03em;white-space:nowrap}
+.b-low{background:#D1FAE5;color:#065F46}
+.b-medium{background:#FEF3C7;color:#92400E}
+.b-high{background:#FFEDD5;color:#9A3412}
+.b-critical{background:#FEE2E2;color:#991B1B}
+.b-ok{background:#D1FAE5;color:#065F46}
+.b-fail{background:#FEE2E2;color:#991B1B}
+.b-neutral{background:var(--muted);color:var(--muted-fg)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 22px;border:1px solid transparent;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;transition:background-color .2s,border-color .2s,transform .15s,box-shadow .2s;text-decoration:none}
+.btn-primary{background:var(--accent-strong);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-primary:active{transform:translateY(1px)}
+.btn-ghost{background:var(--card);border-color:var(--border);color:var(--fg)}
+.btn-ghost:hover{border-color:var(--muted-fg)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+
+.gbar{height:10px;border-radius:999px;background:var(--muted);overflow:hidden}
+.gbar>i{display:block;height:100%;border-radius:999px;transition:width .45s ease}
+.c-green{background:var(--accent)}
+.c-amber{background:var(--warning)}
+.c-red{background:var(--destructive)}
+
+.tbl-wrap{overflow:auto;max-height:62vh;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:860px}
+.tbl th{position:sticky;top:0;z-index:2;text-align:left;padding:11px 14px;background:var(--muted);color:var(--muted-fg);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;border-bottom:1px solid var(--border)}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tbody tr{transition:background-color .15s}
+.tbl tbody tr:hover{background:var(--muted)}
+.tbl .num{font-family:'Fira Code',monospace;text-align:right}
+.tbl td.num{font-variant-numeric:tabular-nums}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:36px 20px;color:var(--muted-fg);text-align:center;font-size:13px}
+.empty svg{color:var(--border);margin-bottom:4px}
+
+.error-banner{display:none;align-items:flex-start;gap:10px;background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:var(--radius);padding:12px 16px;font-size:13px;margin-bottom:16px}
+.error-banner.show{display:flex}
+.error-banner svg{flex:none;margin-top:1px}
+
+.alert-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.alert-item:last-child{border-bottom:none}
+.alert-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none}
+.alert-icon.high{background:#FFEDD5;color:#9A3412}
+.alert-icon.critical{background:#FEE2E2;color:#991B1B}
+.alert-item .a-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.alert-item .a-body{flex:1;min-width:0}
+.alert-item .a-title{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.alert-item .a-sub{font-size:12px;color:var(--muted-fg);margin-top:2px}
+.alert-item .a-action{font-size:12px;color:var(--fg);margin-top:4px;display:flex;gap:6px;align-items:flex-start}
+
+/* ---------- forms ---------- */
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted-fg);font-weight:500}
+.field input,.field select{padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-family:'Fira Code',monospace;font-size:14px;background:var(--card);color:var(--fg);transition:border-color .2s,box-shadow .2s}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(5,150,105,.15)}
+.form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:1024px){.form-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.form-grid{grid-template-columns:1fr}}
+.form-actions{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap}
+.spinner{width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading{display:none;align-items:center;gap:8px;color:var(--muted-fg);font-size:13px}
+.loading.show{display:flex}
+
+/* ---------- result panel ---------- */
+.result{display:none;margin-top:20px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow);padding:24px;animation:pageIn .25s ease}
+.result.show{display:block}
+.result-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.result-head .lhs{display:flex;align-items:center;gap:12px}
+.result-title{font-family:'Fira Code',monospace;font-size:20px;font-weight:700}
+.result-meta{display:flex;gap:14px;font-size:12px;color:var(--muted-fg);font-family:'Fira Code',monospace;flex-wrap:wrap}
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0 4px}
+.gauge-wrap .g-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg)}
+.gauge-val{font-family:'Fira Code',monospace;font-size:24px;font-weight:700;fill:var(--fg)}
+.gauge-min{font-family:'Fira Code',monospace;font-size:10px;fill:var(--muted-fg)}
+.action-box{display:flex;gap:12px;background:var(--muted);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;align-items:flex-start}
+.action-box svg{flex:none;margin-top:1px;color:var(--accent-strong)}
+.action-box.critical{background:#FEF2F2;border-color:#FECACA}
+.action-box.critical svg{color:var(--destructive)}
+.action-box .a-t{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:2px}
+.action-box .a-d{font-size:14px;font-weight:500}
+.risk-ribbon{font-family:'Fira Code',monospace;font-size:13px;font-weight:600;padding:4px 12px;border-radius:8px}
+
+/* ---------- monitor ---------- */
+.eq-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px;transition:box-shadow .2s,transform .2s}
+.eq-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.eq-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.eq-name{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.eq-name svg{color:var(--accent-strong);flex:none}
+.eq-meta{display:flex;gap:16px;font-size:12px;color:var(--muted-fg);font-family:'Fira Code',monospace;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px}
+.eq-meta b{display:block;font-weight:600;color:var(--fg)}
+.prob-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted-fg)}
+.prob-row .mono{font-weight:700;font-size:14px}
+.sensor{display:flex;flex-direction:column;gap:5px}
+.sensor-top{display:flex;justify-content:space-between;font-size:12px;color:var(--muted-fg)}
+.sensor-top .mono{color:var(--fg);font-weight:600}
+
+/* ---------- history filters ---------- */
+.filters{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.search-box{position:relative;flex:1;min-width:200px;max-width:340px}
+.search-box svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted-fg);pointer-events:none}
+.search-box input{width:100%;padding:9px 12px 9px 36px;border:1px solid var(--border);border-radius:var(--radius);font-family:'Fira Code',monospace;font-size:13px;background:var(--card);color:var(--fg);transition:border-color .2s,box-shadow .2s}
+.search-box input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(5,150,105,.15)}
+.filter-select{padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--card);color:var(--fg);cursor:pointer;transition:border-color .2s}
+.filter-select:focus{outline:none;border-color:var(--accent)}
+
+/* ---------- model info ---------- */
+.param-table{width:100%;border-collapse:collapse;font-size:13px}
+.param-table td{padding:9px 12px;border-bottom:1px solid var(--border)}
+.param-table tr:last-child td{border-bottom:none}
+.param-table td:first-child{color:var(--muted-fg);font-weight:500;width:44%}
+.param-table td:last-child{font-family:'Fira Code',monospace}
+
+.section-title{font-size:15px;font-weight:600;margin:26px 0 12px;display:flex;align-items:center;gap:8px}
+.section-title:first-child{margin-top:0}
+
+.feed-card{display:flex;flex-direction:column}
+
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);width:var(--sidebar-w)}
+  .sidebar.open{transform:translateX(0);box-shadow:var(--shadow-md)}
+  .main{margin-left:0}
+  .menu-btn{display:inline-flex}
+  .overlay.show{display:block}
+  .topbar{padding:0 16px}
+  .health span.txt{display:none}
+}
+</style>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    </div>
+    <div class="brand-text"><strong>Predictive</strong><small>Maintenance · MLOps</small></div>
+  </div>
+  <nav class="side-nav" id="sideNav"></nav>
+  <div class="side-foot">
+    <div class="row"><span class="dot ok" id="sideDot"></span><span id="sideHealth" class="mono">Connecting…</span></div>
+    <div class="row">API · RandomForest</div>
+  </div>
+</aside>
+
+<div class="overlay" id="overlay"></div>
+
+<div class="main">
+  <header class="topbar">
+    <button class="icon-btn menu-btn" id="menuBtn" aria-label="Toggle navigation">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <h2 id="pageTitle">Dashboard</h2>
+    <div class="top-actions">
+      <span class="health"><span class="dot ok" id="healthDot"></span><span class="txt mono" id="healthText">healthy</span></span>
+      <button class="icon-btn" id="refreshBtn" title="Refresh" aria-label="Refresh data">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <div class="error-banner" id="errorBanner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+      <div><strong>API unreachable.</strong> <span id="errorMsg">Check that the server is running.</span></div>
+    </div>
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <section class="page" id="page-dashboard">
+      <div class="grid g-kpi" id="kpis"></div>
+      <div class="grid g-2" style="margin-top:16px">
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Risk Distribution</h3><div class="chart-box"><canvas id="chRiskDist"></canvas></div></div>
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>Predictions Over Time</h3><div class="chart-box"><canvas id="chTime"></canvas></div></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1.5fr 1fr;margin-top:16px" id="dashBottom">
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16v-4M12 16v-7M17 16v-2M22 3l-3 3-4-4-3 3-4-4-3 3-2-2"/></svg>Failure Risk by Equipment Type</h3><div class="chart-box"><canvas id="chEqRisk"></canvas></div></div>
+        <div class="panel feed-card"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Alerts — High / Critical</h3><div id="alerts" style="overflow:auto;max-height:280px"></div></div>
+      </div>
+    </section>
+
+    <!-- ===================== MONITOR ===================== -->
+    <section class="page" id="page-monitor">
+      <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        Critical Equipment
+      </div>
+      <div id="criticalZone"></div>
+      <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/><path d="M6 6h.01M10 6h.01"/></svg>
+        Equipment Risk Board
+      </div>
+      <div class="grid g-4" id="eqBoard"></div>
+    </section>
+
+    <!-- ===================== PREDICT ===================== -->
+    <section class="page" id="page-predict">
+      <div class="panel" style="max-width:1100px">
+        <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>Equipment Health Assessment</h3>
+        <form id="predictForm">
+          <div class="form-grid">
+            <div class="field"><label for="equipment_type">Equipment Type</label><select id="equipment_type"><option value="pump">Pump</option><option value="motor">Motor</option><option value="compressor">Compressor</option><option value="turbine">Turbine</option></select></div>
+            <div class="field"><label for="age_months">Age (months)</label><input type="number" id="age_months" value="60" min="1" max="300"></div>
+            <div class="field"><label for="operating_hours">Operating Hours</label><input type="number" id="operating_hours" value="20000" min="0" step="100"></div>
+            <div class="field"><label for="maintenance_history">Maintenance Events</label><input type="number" id="maintenance_history" value="5" min="0"></div>
+            <div class="field"><label for="sensor_temp">Temperature (°C)</label><input type="number" id="sensor_temp" value="70" min="0" max="200" step="0.1"></div>
+            <div class="field"><label for="sensor_vibration">Vibration (mm/s)</label><input type="number" id="sensor_vibration" value="1.0" min="0" max="15" step="0.01"></div>
+            <div class="field"><label for="sensor_pressure">Pressure (bar)</label><input type="number" id="sensor_pressure" value="35" min="0" max="100" step="0.1"></div>
+            <div class="field"><label for="sensor_humidity">Humidity (%)</label><input type="number" id="sensor_humidity" value="50" min="0" max="100" step="0.1"></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="predictBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+              Predict Failure
+            </button>
+            <button type="button" class="btn btn-ghost" id="resetBtn">Reset</button>
+            <div class="loading" id="loading"><div class="spinner"></div> Analyzing…</div>
+          </div>
+        </form>
+      </div>
+
+      <div class="result" id="result" style="max-width:1100px">
+        <div class="result-head">
+          <div class="lhs">
+            <span class="risk-ribbon" id="rRibbon">—</span>
+            <div>
+              <div class="result-title" id="rTitle">—</div>
+              <div class="result-meta" id="rMeta"></div>
+            </div>
+          </div>
+          <span class="badge b-neutral" id="rBadge">No assessment</span>
+        </div>
+        <div class="grid g-3">
+          <div class="gauge-wrap" id="rGauge"></div>
+          <div class="panel" style="box-shadow:none">
+            <h3>Recommended Action</h3>
+            <div class="action-box" id="rAction"></div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px">
+              <div class="kpi"><span class="k-label">Probability</span><span class="k-value" id="rProb">—</span></div>
+              <div class="kpi"><span class="k-label">Risk Level</span><span class="k-value" id="rRiskLvl">—</span></div>
+              <div class="kpi"><span class="k-label">Latency</span><span class="k-value" id="rLat">—</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" id="againBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Analyze another
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== FLEET ===================== -->
+    <section class="page" id="page-fleet">
+      <div class="grid g-2">
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16v-4M12 16v-7M17 16v-2M22 3l-3 3-4-4-3 3-4-4-3 3-2-2"/></svg>Failure Rate by Equipment Type</h3><div class="chart-box"><canvas id="chFleetType"></canvas></div></div>
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>Risk by Age Bucket</h3><div class="chart-box"><canvas id="chAgeBucket"></canvas></div></div>
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Vibration vs Failure Probability</h3><div class="chart-box"><canvas id="chVibScatter"></canvas></div></div>
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Operating Hours vs Failure Probability</h3><div class="chart-box"><canvas id="chHrScatter"></canvas></div></div>
+      </div>
+    </section>
+
+    <!-- ===================== HISTORY ===================== -->
+    <section class="page" id="page-history">
+      <div class="filters">
+        <div class="search-box">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="histSearch" placeholder="Search equipment type…">
+        </div>
+        <select class="filter-select" id="histRisk">
+          <option value="all">All risk levels</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+        <span class="mono" style="font-size:12px;color:var(--muted-fg)" id="histCount"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Time</th><th>Equipment</th><th class="num">Age</th><th class="num">Hours</th><th class="num">Maint.</th><th class="num">Temp °C</th><th class="num">Vib mm/s</th><th class="num">Pres bar</th><th class="num">Prob.</th><th>Prediction</th><th>Risk</th><th class="num">Lat ms</th></tr></thead>
+          <tbody id="histBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================== MODEL ===================== -->
+    <section class="page" id="page-model">
+      <div class="grid g-kpi" id="modelKpis"></div>
+      <div class="grid g-2" style="margin-top:16px">
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>Feature Importance</h3><div class="chart-box"><canvas id="chFeatImp"></canvas></div></div>
+        <div class="panel"><h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>Model Parameters</h3>
+          <div class="tbl-wrap" style="max-height:none;border:none">
+            <table class="param-table" id="paramTable"></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+'use strict';
+
+/* ---------------- utils ---------------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtNum = v => Number(v || 0).toLocaleString('en-US');
+const fmtPct = (v, d = 1) => (v * 100).toFixed(d) + '%';
+const fmtTime = ts => new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function timeAgo(ts){
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return s + 's ago';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h / 24) + 'd ago';
+}
+const ICON = {
+  dashboard:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  monitor:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  predict:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  fleet:'<path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+  history:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  model:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>'
+};
+const svg = (p, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+
+const RISK = { low:{color:'#059669',label:'Low'}, medium:{color:'#D97706',label:'Medium'}, high:{color:'#EA580C',label:'High'}, critical:{color:'#DC2626',label:'Critical'} };
+const RISK_ORDER = ['low','medium','high','critical'];
+const ACTIONS = {
+  low:'Continue routine monitoring. Next scheduled inspection in 90 days.',
+  medium:'Schedule inspection within 30 days and monitor the vibration trend.',
+  high:'Schedule inspection within 7 days. Review recent maintenance records.',
+  critical:'Immediate action recommended: inspect within 24 hours or prepare for shutdown.'
+};
+const badge = r => `<span class="badge b-${r}">${r}</span>`;
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(path + ' → ' + r.status);
+  return r.json();
+}
+function showError(msg){
+  $('#errorMsg').textContent = msg || 'Check that the server is running.';
+  $('#errorBanner').classList.add('show');
+}
+function hideError(){ $('#errorBanner').classList.remove('show'); }
+
+/* ---------------- charts ---------------- */
+let charts = {};
+function mkChart(id, cfg){
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), cfg);
+}
+function destroyCharts(){ Object.values(charts).forEach(c => c.destroy()); charts = {}; }
+Chart.defaults.font.family = "'Fira Sans',sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#475569';
+Chart.defaults.borderColor = 'rgba(15,23,42,.07)';
+
+function emptyIn(id, msg){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `<div class="empty">${svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', 26)}<div>${esc(msg || 'No data yet. Run an assessment.')}</div></div>`;
+}
+
+/* ---------------- nav / router ---------------- */
+const ROUTES = {
+  dashboard: { title:'Dashboard', icon:'dashboard' },
+  monitor:   { title:'Equipment Monitor', icon:'monitor' },
+  predict:   { title:'Failure Prediction', icon:'predict' },
+  fleet:     { title:'Fleet Analytics', icon:'fleet' },
+  history:   { title:'Assessment History', icon:'history' },
+  model:     { title:'Model Information', icon:'model' }
+};
+const RENDERERS = {
+  dashboard: renderDashboard,
+  monitor: renderMonitor,
+  predict: renderPredict,
+  fleet: renderFleet,
+  history: renderHistoryPage,
+  model: renderModel
+};
+
+function buildNav(){
+  $('#sideNav').innerHTML = Object.entries(ROUTES).map(([key, r]) =>
+    `<a href="#/${key}" class="nav-item" data-route="${key}">${svg(ICON[r.icon], 18)}<span>${r.title}</span></a>`
+  ).join('');
+}
+function currentRoute(){
+  const h = location.hash.replace(/^#\//, '');
+  return ROUTES[h] ? h : 'dashboard';
+}
+function navigate(){
+  const route = currentRoute();
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + route));
+  document.querySelectorAll('.nav-item').forEach(a => a.classList.toggle('active', a.dataset.route === route));
+  $('#pageTitle').textContent = ROUTES[route].title;
+  destroyCharts();
+  hideError();
+  try { RENDERERS[route](); } catch (e) { showError(e.message); }
+  closeSidebar();
+}
+
+/* ---------------- shared data helpers ---------------- */
+function byType(items){
+  const m = {};
+  items.forEach(i => { (m[i.equipment_type] = m[i.equipment_type] || []).push(i); });
+  return m;
+}
+function rateOf(list){ return list.length ? list.filter(i => i.prediction === 'failure').length / list.length : 0; }
+function latestByType(items){
+  const m = {};
+  items.forEach(i => { if (!m[i.equipment_type] || i.timestamp > m[i.equipment_type].timestamp) m[i.equipment_type] = i; });
+  return m;
+}
+
+/* ---------------- dashboard ---------------- */
+async function renderDashboard(){
+  let stats, hist;
+  try { [stats, hist] = await Promise.all([api('/stats'), api('/history?limit=200')]); }
+  catch (e) { showError(e.message); return; }
+  const items = hist.items;
+
+  const highRisk = items.filter(i => i.risk_level === 'high' || i.risk_level === 'critical').length;
+  $('#kpis').innerHTML = `
+    <div class="kpi"><span class="k-label">Total Assessments</span><span class="k-value">${fmtNum(stats.total_predictions)}</span><span class="k-sub">in-memory log · cap ${hist.cap}</span></div>
+    <div class="kpi"><span class="k-label">Failure Rate</span><span class="k-value ${stats.failure_rate >= .3 ? 'bad' : stats.failure_rate >= .15 ? 'warn' : 'ok'}">${fmtPct(stats.failure_rate)}</span><span class="k-sub">of all assessments</span></div>
+    <div class="kpi"><span class="k-label">High-Risk Count</span><span class="k-value ${highRisk ? 'warn' : 'ok'}">${highRisk}</span><span class="k-sub">high + critical</span></div>
+    <div class="kpi"><span class="k-label">Avg Failure Probability</span><span class="k-value acc">${fmtPct(stats.avg_probability)}</span><span class="k-sub">model confidence</span></div>`;
+
+  const dist = stats.risk_level_distribution || {};
+  if (stats.total_predictions === 0) { emptyIn('chRiskDist'); emptyIn('chTime'); emptyIn('chEqRisk'); $('#alerts').innerHTML = '<div class="empty">No alerts yet.</div>'; return; }
+
+  mkChart('chRiskDist', {
+    type:'doughnut',
+    data:{ labels: RISK_ORDER.map(r => RISK[r].label),
+      datasets:[{ data: RISK_ORDER.map(r => dist[r] || 0),
+        backgroundColor: RISK_ORDER.map(r => RISK[r].color), borderColor:'#fff', borderWidth:2 }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, boxHeight:10, padding:14 }},
+        tooltip:{ callbacks:{ label: c => ` ${c.label}: ${c.parsed} (${fmtPct(c.parsed / stats.total_predictions)})` } } } }
+  });
+
+  const span = items.length ? items[0].timestamp - items[items.length - 1].timestamp : 0;
+  const step = span < 5 * 60000 ? 10000 : span < 60 * 60000 ? 60000 : 10 * 60000;
+  const buckets = new Map();
+  items.forEach(i => {
+    const k = Math.floor(i.timestamp / step) * step;
+    if (!buckets.has(k)) buckets.set(k, { all:0, fail:0 });
+    const b = buckets.get(k); b.all++; if (i.prediction === 'failure') b.fail++;
+  });
+  const keys = [...buckets.keys()].sort((a,b) => a - b);
+  mkChart('chTime', {
+    type:'line',
+    data:{ labels: keys.map(k => fmtTime(k + step)),
+      datasets:[
+        { label:'Assessments', data: keys.map(k => buckets.get(k).all), borderColor:'#334155', backgroundColor:'rgba(51,65,85,.08)', fill:true, tension:.35, pointRadius:2, pointHoverRadius:4 },
+        { label:'Failures', data: keys.map(k => buckets.get(k).fail), borderColor:'#DC2626', backgroundColor:'rgba(220,38,38,.08)', fill:true, tension:.35, pointRadius:2, pointHoverRadius:4 } ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+      scales:{ x:{ grid:{ display:false } }, y:{ beginAtZero:true, ticks:{ precision:0 } } },
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, boxHeight:10, padding:14 } } } }
+  });
+
+  const types = Object.keys(byType(items)).sort();
+  mkChart('chEqRisk', {
+    type:'bar',
+    data:{ labels: types.map(t => t[0].toUpperCase() + t.slice(1)),
+      datasets:[{ label:'Failure rate', data: types.map(t => rateOf(byType(items)[t]) * 100),
+        backgroundColor:'#059669', borderRadius:6, maxBarThickness:46 }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ y:{ beginAtZero:true, max:100, ticks:{ callback: v => v + '%' } }, x:{ grid:{ display:false } } },
+      plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: c => ` ${c.parsed.y.toFixed(1)}%` } } } }
+  });
+
+  const alerts = items.filter(i => i.risk_level === 'high' || i.risk_level === 'critical').slice(0, 8);
+  $('#alerts').innerHTML = alerts.length ? alerts.map(i => `
+    <div class="alert-item">
+      <div class="alert-icon ${i.risk_level}">${svg('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>', 16)}</div>
+      <div class="a-body">
+        <div class="a-title">${esc(i.equipment_type)} ${badge(i.risk_level)} <span class="mono" style="color:${RISK[i.risk_level].color};font-weight:700">${fmtPct(i.probability)}</span></div>
+        <div class="a-sub">${timeAgo(i.timestamp)} · ${fmtNum(i.age_months)} months · ${fmtNum(i.operating_hours)} hrs</div>
+        <div class="a-action">${svg('<path d="M5 12h14M12 5l7 7-7 7"/>', 13)} ${esc(ACTIONS[i.risk_level])}</div>
+      </div>
+    </div>`).join('') : '<div class="empty">No high-risk events. All clear.</div>';
+}
+
+/* ---------------- monitor ---------------- */
+function sensorBar(label, value, max, decimals, unit){
+  const pct = Math.min(100, (value / max) * 100);
+  const cls = pct >= 85 ? 'c-red' : pct >= 60 ? 'c-amber' : 'c-green';
+  return `<div class="sensor">
+    <div class="sensor-top"><span>${label}</span><span class="mono">${value.toFixed(decimals)} ${unit}</span></div>
+    <div class="gbar"><i class="${cls}" style="width:${pct}%"></i></div>
+  </div>`;
+}
+async function renderMonitor(){
+  let hist;
+  try { hist = await api('/history?limit=200'); } catch (e) { showError(e.message); return; }
+  const items = hist.items;
+
+  const crit = items.filter(i => i.risk_level === 'high' || i.risk_level === 'critical')
+                    .sort((a,b) => b.probability - a.probability).slice(0, 6);
+  $('#criticalZone').innerHTML = crit.length ? `<div class="panel" style="background:#FEF2F2;border-color:#FECACA">
+    <h3 style="color:#991B1B">${svg('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>', 14)} ${crit.length} unit${crit.length > 1 ? 's' : ''} in critical condition</h3>
+    <div style="overflow:auto;max-height:240px">${crit.map(i => `<div class="alert-item">
+      <div class="alert-icon ${i.risk_level}">${svg('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>', 16)}</div>
+      <div class="a-body">
+        <div class="a-title">${esc(i.equipment_type)} ${badge(i.risk_level)} <span class="mono" style="color:${RISK[i.risk_level].color};font-weight:700">${fmtPct(i.probability)}</span></div>
+        <div class="a-sub">${timeAgo(i.timestamp)} · age ${fmtNum(i.age_months)} mo · vibration ${i.sensor_vibration.toFixed(2)} mm/s</div>
+        <div class="a-action">${svg('<path d="M5 12h14M12 5l7 7-7 7"/>', 13)} ${esc(ACTIONS[i.risk_level])}</div>
+      </div></div>`).join('')}</div></div>`
+    : '<div class="panel" style="background:#F0FDF4;border-color:#BBF7D0"><div class="empty" style="padding:18px">All equipment operating within normal bounds.</div></div>';
+
+  const eqOrder = ['pump','motor','compressor','turbine'];
+  const latest = latestByType(items);
+  const cards = eqOrder.filter(t => latest[t]).map(t => {
+    const e = latest[t];
+    const pct = Math.min(100, e.probability * 100);
+    return `<div class="eq-card">
+      <div class="eq-head">
+        <div class="eq-name">${svg(ICON.monitor, 17)} ${t[0].toUpperCase() + t.slice(1)}</div>
+        ${badge(e.risk_level)}
+      </div>
+      <div class="prob-row"><span>Failure probability</span><div class="gbar" style="flex:1"><i class="${e.risk_level === 'low' ? 'c-green' : e.risk_level === 'medium' ? 'c-amber' : 'c-red'}" style="width:${pct}%"></i></div><span class="mono">${fmtPct(e.probability)}</span></div>
+      ${sensorBar('Temperature', e.sensor_temp, 150, 1, '°C')}
+      ${sensorBar('Vibration', e.sensor_vibration, 10, 2, 'mm/s')}
+      ${sensorBar('Pressure', e.sensor_pressure, 80, 1, 'bar')}
+      ${sensorBar('Humidity', e.sensor_humidity, 100, 0, '%')}
+      <div class="eq-meta">
+        <span><b>Age</b>${fmtNum(e.age_months)} mo</span>
+        <span><b>Hours</b>${fmtNum(e.operating_hours)}</span>
+        <span><b>Maint.</b>${e.maintenance_history}</span>
+        <span><b>Assessed</b>${timeAgo(e.timestamp)}</span>
+      </div>
+    </div>`;
+  }).join('');
+  $('#eqBoard').innerHTML = cards || '<div class="panel"><div class="empty">No sensor data yet.</div></div>';
+}
+
+/* ---------------- predict ---------------- */
+async function renderPredict(){}
+function probGauge(p){
+  const r = 70, total = Math.PI * r;
+  const off = total * (1 - Math.min(1, Math.max(0, p)));
+  const color = p >= .7 ? '#DC2626' : p >= .4 ? '#EA580C' : p >= .2 ? '#D97706' : '#059669';
+  return `<svg width="220" height="118" viewBox="0 0 160 88" role="img" aria-label="Failure probability ${fmtPct(p)}">
+    <path d="M 10 80 A 70 70 0 0 1 150 80" fill="none" stroke="#E6E8EA" stroke-width="12" stroke-linecap="round"/>
+    <path d="M 10 80 A 70 70 0 0 1 150 80" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round"
+      stroke-dasharray="${total.toFixed(1)} ${total.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>
+    <text x="80" y="72" text-anchor="middle" class="gauge-val">${fmtPct(p)}</text>
+    <text x="14" y="88" text-anchor="middle" class="gauge-min">0</text>
+    <text x="80" y="88" text-anchor="middle" class="gauge-min">50</text>
+    <text x="146" y="88" text-anchor="middle" class="gauge-min">100</text>
+  </svg>`;
+}
+async function handlePredict(e){
+  e.preventDefault();
+  const btn = $('#predictBtn'), load = $('#loading');
+  btn.disabled = true; load.classList.add('show');
+  const body = {
+    equipment_type: $('#equipment_type').value,
+    age_months: +$('#age_months').value,
+    operating_hours: +$('#operating_hours').value,
+    maintenance_history: +$('#maintenance_history').value,
+    sensor_temp: +$('#sensor_temp').value,
+    sensor_vibration: +$('#sensor_vibration').value,
+    sensor_pressure: +$('#sensor_pressure').value,
+    sensor_humidity: +$('#sensor_humidity').value
+  };
+  try {
+    const t0 = performance.now();
+    const d = await api('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const lat = (performance.now() - t0).toFixed(1);
+
+    const res = $('#result');
+    res.classList.add('show');
+    res.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    const c = RISK[d.risk_level].color;
+    $('#rRibbon').textContent = d.risk_level.toUpperCase() + ' RISK';
+    $('#rRibbon').style.color = c;
+    $('#rRibbon').style.border = '1px solid ' + c;
+    $('#rTitle').textContent = d.prediction === 'failure' ? 'FAILURE PREDICTED' : 'OPERATIONAL';
+    $('#rTitle').style.color = d.prediction === 'failure' ? 'var(--destructive)' : 'var(--accent-strong)';
+    $('#rMeta').textContent = `${new Date().toLocaleString()} · ${body.equipment_type} · age ${body.age_months} mo`;
+    const b = $('#rBadge');
+    b.className = 'badge ' + (d.prediction === 'failure' ? 'b-fail' : 'b-ok');
+    b.textContent = d.prediction === 'failure' ? 'FAILURE' : 'OPERATIONAL';
+    $('#rGauge').innerHTML = `<span class="g-label">Failure Probability</span>${probGauge(d.probability)}<span class="g-label">risk: ${d.risk_level}</span>`;
+    $('#rProb').textContent = fmtPct(d.probability);
+    $('#rProb').style.color = c;
+    $('#rRiskLvl').textContent = d.risk_level.toUpperCase();
+    $('#rRiskLvl').style.color = c;
+    $('#rLat').textContent = lat + ' ms';
+    const box = $('#rAction');
+    box.className = 'action-box' + (d.risk_level === 'critical' ? ' critical' : '');
+    box.innerHTML = `${svg('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      <div><div class="a-t">Recommended action</div><div class="a-d">${esc(ACTIONS[d.risk_level])}</div></div>`;
+    checkHealth();
+  } catch (err) {
+    showError(err.message);
+    const res = $('#result');
+    res.classList.add('show');
+    $('#rTitle').textContent = 'ERROR';
+    $('#rTitle').style.color = 'var(--destructive)';
+    $('#rRibbon').textContent = 'REQUEST FAILED';
+    $('#rMeta').textContent = err.message;
+    $('#rGauge').innerHTML = '';
+    $('#rAction').className = 'action-box critical';
+    $('#rAction').innerHTML = `<div><div class="a-t">Unable to complete assessment</div><div class="a-d">${esc(err.message)}</div></div>`;
+  } finally { btn.disabled = false; load.classList.remove('show'); }
+}
+
+/* ---------------- fleet ---------------- */
+async function renderFleet(){
+  let hist;
+  try { hist = await api('/history?limit=200'); } catch (e) { showError(e.message); return; }
+  const items = hist.items;
+  if (!items.length){
+    ['chFleetType','chAgeBucket','chVibScatter','chHrScatter'].forEach(id => emptyIn(id));
+    return;
+  }
+  const types = Object.keys(byType(items)).sort();
+  mkChart('chFleetType', {
+    type:'bar',
+    data:{ labels: types.map(t => t[0].toUpperCase() + t.slice(1)),
+      datasets:[{ label:'Failure rate', data: types.map(t => rateOf(byType(items)[t]) * 100),
+        backgroundColor:'#059669', borderRadius:6, maxBarThickness:46 }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ y:{ beginAtZero:true, max:100, ticks:{ callback: v => v + '%' } }, x:{ grid:{ display:false } } },
+      plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: c => ` ${c.parsed.y.toFixed(1)}%` } } } }
+  });
+
+  const ages = [[0,24,'0–24'],[24,60,'24–60'],[60,120,'60–120'],[120,180,'120–180'],[180,301,'180+']];
+  const ageData = ages.map(([lo,hi,label]) => {
+    const g = items.filter(i => i.age_months >= lo && i.age_months < hi);
+    return { label, rate: rateOf(g) * 100 };
+  });
+  mkChart('chAgeBucket', {
+    type:'bar',
+    data:{ labels: ageData.map(d => d.label),
+      datasets:[{ label:'Failure rate', data: ageData.map(d => d.rate),
+        backgroundColor:'#334155', borderRadius:6, maxBarThickness:46 }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ y:{ beginAtZero:true, max:100, ticks:{ callback: v => v + '%' } }, x:{ grid:{ display:false } } },
+      plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: c => ` ${c.parsed.y.toFixed(1)}%` } } } }
+  });
+
+  const scatter = (id, xKey, xLabel) => mkChart(id, {
+    type:'scatter',
+    data:{ datasets:[{ label:xLabel, data: items.map(i => ({ x:i[xKey], y:i.probability * 100 })),
+      backgroundColor: items.map(i => RISK[i.risk_level].color + '99'),
+      borderColor: items.map(i => RISK[i.risk_level].color), pointRadius:4, pointHoverRadius:6 }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ title:{ display:true, text:xLabel, color:'#475569' } },
+        y:{ beginAtZero:true, max:100, title:{ display:true, text:'Failure probability %', color:'#475569' }, ticks:{ callback: v => v + '%' } } },
+      plugins:{ legend:{ display:false } } }
+  });
+  scatter('chVibScatter', 'sensor_vibration', 'Vibration (mm/s)');
+  scatter('chHrScatter', 'operating_hours', 'Operating hours');
+}
+
+/* ---------------- history ---------------- */
+let histCache = [];
+function renderHistoryTable(){
+  const q = $('#histSearch').value.trim().toLowerCase();
+  const risk = $('#histRisk').value;
+  const rows = histCache.filter(i =>
+    (risk === 'all' || i.risk_level === risk) &&
+    (!q || i.equipment_type.toLowerCase().includes(q))
+  );
+  $('#histCount').textContent = `${rows.length} / ${histCache.length} assessments`;
+  $('#histBody').innerHTML = rows.length ? rows.map(i => `<tr>
+    <td class="mono">${fmtTime(i.timestamp)}</td>
+    <td>${esc(i.equipment_type)}</td>
+    <td class="num">${fmtNum(i.age_months)}</td>
+    <td class="num">${fmtNum(i.operating_hours)}</td>
+    <td class="num">${i.maintenance_history}</td>
+    <td class="num">${i.sensor_temp.toFixed(1)}</td>
+    <td class="num">${i.sensor_vibration.toFixed(2)}</td>
+    <td class="num">${i.sensor_pressure.toFixed(1)}</td>
+    <td class="num">${fmtPct(i.probability)}</td>
+    <td><span class="badge ${i.prediction === 'failure' ? 'b-fail' : 'b-ok'}">${i.prediction.toUpperCase()}</span></td>
+    <td>${badge(i.risk_level)}</td>
+    <td class="num">${i.latency_ms.toFixed(1)}</td>
+  </tr>`).join('')
+  : `<tr><td colspan="12" style="text-align:center;color:var(--muted-fg);padding:28px">No assessments match your filters.</td></tr>`;
+}
+async function renderHistoryPage(){
+  try { histCache = (await api('/history?limit=200')).items; } catch (e) { showError(e.message); return; }
+  renderHistoryTable();
+}
+
+/* ---------------- model ---------------- */
+async function renderModel(){
+  let info;
+  try { info = await api('/model-info'); } catch (e) { showError(e.message); return; }
+  $('#modelKpis').innerHTML = `
+    <div class="kpi"><span class="k-label">AUC</span><span class="k-value acc">${info.auc.toFixed(4)}</span><span class="k-sub">test set · 20% holdout</span></div>
+    <div class="kpi"><span class="k-label">F1 Score</span><span class="k-value acc">${info.f1.toFixed(4)}</span><span class="k-sub">balanced classes</span></div>
+    <div class="kpi"><span class="k-label">Trees</span><span class="k-value">${fmtNum(info.n_estimators)}</span><span class="k-sub">n_estimators</span></div>
+    <div class="kpi"><span class="k-label">Training Samples</span><span class="k-value">${fmtNum(info.training_samples)}</span><span class="k-sub">synthetic records</span></div>`;
+
+  const fi = info.feature_importance.slice(0, 10);
+  mkChart('chFeatImp', {
+    type:'bar',
+    data:{ labels: fi.map(f => f.feature).reverse(),
+      datasets:[{ data: fi.map(f => f.importance).reverse(),
+        backgroundColor:'#059669', borderRadius:5, maxBarThickness:18 }]},
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ beginAtZero:true, title:{ display:true, text:'Importance', color:'#475569' } }, y:{ grid:{ display:false } } },
+      plugins:{ legend:{ display:false } } }
+  });
+
+  $('#paramTable').innerHTML = [
+    ['Model name', info.model_name],
+    ['Algorithm', 'Random Forest Classifier'],
+    ['n_estimators', info.n_estimators],
+    ['max_depth', info.max_depth],
+    ['Class weight', 'balanced'],
+    ['Training samples', fmtNum(info.training_samples)],
+    ['Features', info.features.join(', ')],
+    ['AUC (holdout)', info.auc.toFixed(4)],
+    ['F1 (holdout)', info.f1.toFixed(4)]
+  ].map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(String(v))}</td></tr>`).join('');
+}
+
+/* ---------------- health / sidebar ---------------- */
+async function checkHealth(){
+  try {
+    const d = await api('/health');
+    const ok = d.status === 'healthy' && d.model_loaded;
+    $('#healthDot').className = 'dot ' + (ok ? 'ok' : 'warn');
+    $('#sideDot').className = 'dot ' + (ok ? 'ok' : 'warn');
+    $('#healthText').textContent = d.status;
+    $('#sideHealth').textContent = ok ? 'model loaded' : 'model missing';
+  } catch {
+    $('#healthDot').className = 'dot err';
+    $('#sideDot').className = 'dot err';
+    $('#healthText').textContent = 'offline';
+    $('#sideHealth').textContent = 'offline';
+  }
+}
+function openSidebar(){ $('#sidebar').classList.add('open'); $('#overlay').classList.add('show'); }
+function closeSidebar(){ $('#sidebar').classList.remove('open'); $('#overlay').classList.remove('show'); }
+
+/* ---------------- init ---------------- */
+function init(){
+  buildNav();
+  $('#predictForm').addEventListener('submit', handlePredict);
+  $('#againBtn').addEventListener('click', () => {
+    $('#result').classList.remove('show');
+    $('#predictForm').scrollIntoView({ behavior:'smooth' });
+  });
+  $('#resetBtn').addEventListener('click', () => {
+    $('#predictForm').reset();
+    $('#result').classList.remove('show');
+  });
+  $('#menuBtn').addEventListener('click', openSidebar);
+  $('#overlay').addEventListener('click', closeSidebar);
+  $('#refreshBtn').addEventListener('click', () => { checkHealth(); navigate(); });
+  $('#histSearch').addEventListener('input', renderHistoryTable);
+  $('#histRisk').addEventListener('change', renderHistoryTable);
+  window.addEventListener('hashchange', navigate);
+  checkHealth();
+  setInterval(checkHealth, 30000);
+  navigate();
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

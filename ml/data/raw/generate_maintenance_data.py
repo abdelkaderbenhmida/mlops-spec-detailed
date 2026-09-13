@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# TODO: medium - Add type hints where missing
+# TODO: low - Add comprehensive docstring
+# TODO: low - Add error handling for edge cases
 """Generate the synthetic predictive maintenance dataset.
 
 Source schema (matches the API contract and ML pipeline):

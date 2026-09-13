@@ -99,6 +99,115 @@ it is trust (§16).
 ## 2. High-Level Architecture
 
 ```
+```mermaid
+graph TD
+    subgraph "Level 0-2: OT Network - NO OUTBOUND CONNECTIVITY"
+        OT[/OT Network/]
+    end
+    OT -->|OPC-UA read-only| DMZ[/DMZ - ANVIL PLATFORM/]
+    
+    subgraph "Level 3.5: DMZ - ANVIL PLATFORM"
+        VM01[ctrl-node 10.20.2.10] -->|Ansible control, ops runbooks| 
+        VM02[gitea-jenkins 10.20.2.11] -->|Git + CI, fully local|
+        VM03[k8s-cp 10.20.2.20] -->|Control plane|
+        VM04[k8s-wk1 10.20.2.21] -->|Worker|
+        VM05[k8s-wk2 10.20.2.22] -->|Worker|
+        VM06[mlflow 10.20.2.30] -->|Tracking + registry|
+        VM07[ingest 10.20.2.31] -->|OPC-UA client → TimescaleDB|
+        VM08[timescale 10.20.2.40] -->|Time-series store|
+        VM09[prometheus 10.20.2.50] -->|Platform metrics|
+        VM10[grafana 10.20.2.51] -->|Operator dashboards + wall display|
+        VM11[training 10.20.2.60] -->|GPU-optional training host|
+        VM12[registry-mirror 10.20.2.61] -->|Offline artifact mirror|
+    end
+    
+    subgraph "Level 4-5: Enterprise IT"
+        CMMS[/CMMS (work orders)/] -->|Multi-plant fleet reporting| BI[/Corporate BI/]
+    end
+    
+    serving[/Serving in Kubernetes/] -->|inference API, alerting, health scoring| OT
+```
+resolves the tension by choosing the environment
+where the design is not merely defensible but mandatory: **an environment where managed
+services are not available at all.**
+
+The 12-VM topology, the IP plan, the Terraform/Ansible split, the Jenkins pipeline, and the
+Prometheus/Grafana stack all survive. What changes is that the VM-centric, no-managed-
+services design stops being a limitation and becomes the entire point.
+
+### 1.2 The enterprise problem
+
+**Unplanned downtime in discrete and process manufacturing, in plants where operational
+technology (OT) data cannot cross the plant boundary.**
+
+Industrial control networks are architected on the Purdue model: Level 0-2 (sensors, PLCs,
+SCADA) are separated from Level 4-5 (enterprise IT, internet) by a Level 3.5 demilitarised
+zone (DMZ). In regulated, defence-adjacent, or risk-averse operators the rule is absolute:
+**no outbound connectivity from the OT network.** IEC 62443, the governing security standard
+for industrial automation, is built around this zone-and-conduit segmentation model.
+
+This is not paranoia. Stuxnet, Triton, and the Colonial Pipeline incident all shaped operator
+policy. Many plants will not permit a cloud agent on the OT side at any price. Every cloud
+predictive-maintenance vendor is therefore structurally excluded from these sites.
+
+**Meanwhile the cost of not doing predictive maintenance is enormous.** Unplanned downtime in
+automotive manufacturing is routinely cited in the range of tens of thousands of dollars per
+minute of stopped line; in continuous process industries a single unplanned shutdown and
+restart can run into millions once off-spec product, restart energy, and schedule disruption
+are counted.
+
+**Anvil is a complete ML platform that installs inside the plant, on the plant's own
+hardware, with no internet connection, ever.**
+
+### 1.3 Why every original design decision now becomes correct
+
+| Original choice | Looked like | Actually is |
+|---|---|---|
+| 12 discrete VMs, one service each | Wasteful; use containers or managed services | Matches how plant IT actually operates: VMware or Proxmox on plant hardware, clear service boundaries, individually restorable, auditable by people who do not use Kubernetes |
+| Self-hosted Postgres on VM08 | Reinventing RDS | There is no RDS. There is a server in a rack in the plant |
+| Self-hosted MLflow on VM06 | Reinventing Vertex AI | No outbound connectivity means no SaaS registry, at all |
+| Jenkins or Gitea on VM02 | Old-fashioned CI | Air-gapped CI must be self-hosted; GitHub Actions requires the internet |
+| Prometheus and Grafana on their own VMs | Over-provisioned | Plant operations already run Grafana on a wall display; this is the native idiom |
+| Terraform targeting libvirt (a no-cost-lab option) | The budget compromise | **The correct answer.** Terraform's libvirt provider against Proxmox or bare KVM is exactly right for on-prem |
+| Private subnet with no bastion tier | An acknowledged gap | Becomes correct once the whole platform sits behind the OT DMZ; the jump host is the plant's existing one |
+| No object storage, local disk artifacts | Not cloud-native | Local NAS is what exists. Cloud-native is irrelevant here |
+
+The original spec was already designing for on-premise. It just had not said so.
+
+### 1.4 Who pays
+
+| Buyer | Their pain | Budget line |
+|---|---|---|
+| Plant Manager | Unplanned line stops; personally accountable for OEE | Operations budget, and it is large |
+| Maintenance Manager | Reactive or fixed-calendar maintenance; over-servicing healthy machines while surprised by failures | Maintenance budget |
+| OT Security Manager | Has vetoed every cloud vendor; under pressure to enable analytics anyway | Veto power — must be a champion, not an obstacle |
+| CFO | Spare-parts inventory is capital sitting on shelves against unpredictable failures | Working capital |
+
+**The value model, for a single line:**
+
+| Quantity | Value |
+|---|---|
+| Line output value | €18,000/hour |
+| Unplanned downtime events per year | 42 |
+| Average duration per event | 3.1 hours |
+| Annual unplanned downtime cost | ~€2.34M |
+| Realistic reduction from predictive maintenance | 20-30% |
+| **Annual value, one line** | **€470k - €700k** |
+
+Secondary savings: **reduced over-maintenance** (condition-based servicing extends intervals
+materially), **spare-parts inventory** (predictable failure horizons let you order rather than
+stock), and **planned versus emergency labour** (emergency call-out rates are multiples of
+planned-window labour cost).
+
+A platform that costs a few hundred thousand to deploy against €500k+ of annual value per
+line, in a plant with a dozen lines, is an easy business case. The hard part is not economics;
+it is trust (§16).
+
+---
+
+## 2. High-Level Architecture
+
+```
 ╔══════════ Level 0-2: OT Network — NO OUTBOUND CONNECTIVITY ══════════╗
 ║                                                                        ║
 ║   [Sensors] ── [PLCs] ── [SCADA / Historian: PI, Ignition, Wonderware] ║

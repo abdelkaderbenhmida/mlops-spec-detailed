@@ -1,152 +1,158 @@
 # Anvil — Enterprise MLOps Platform for Air-Gapped Industrial Plants
 
-On-premise predictive maintenance for manufacturing plants where production data is not
-permitted to leave the site. Anvil installs inside the plant's Level 3.5 DMZ on the plant's
-own hardware — 12 VMs, no internet connection, ever.
+> **On-premise predictive maintenance for manufacturing plants where production data is not 
+> permitted to leave the site.**
 
-## The problem it solves
+## Product: Anvil — Predictive Maintenance on Rotating Equipment
 
-Unplanned downtime in discrete and process manufacturing costs tens of thousands of euros
-per minute of stopped line. OT networks (Purdue model, IEC 62443) forbid outbound
-connectivity, which structurally excludes every cloud predictive-maintenance vendor. Anvil
-is the answer those sites can actually install: a complete ML platform — ingestion, model
-registry, serving, alerting, CI/CD — that runs entirely behind the plant boundary.
+Anvil is a complete ML platform that installs inside the plant, on the plant's own hardware, 
+with no internet connection, ever. Designed for environments where managed services are not 
+available at all — the entire design is mandatory, not optional.
 
-## What it does
+**Target environment**: Plant OT network (Purdue model, IEC 62443) with absolute rule: no outbound 
+connectivity from the OT network. Every cloud predictive-maintenance vendor is structurally 
+excluded from these sites.
 
-- **Infrastructure as Code** (Terraform): 12 VMs in a private `10.20.2.0/24` DMZ subnet,
-  provisioned on the plant's hypervisor (Proxmox/bare KVM via the libvirt provider). No
-  public subnet, no NAT, no cloud credentials.
-- **Configuration management** (Ansible): offline mirror (VM12) first, then Kubernetes
-  cluster (1 control plane + 2 workers), TimescaleDB (telemetry + app DB + MLflow backend),
-  MLflow tracking/registry, OPC-UA ingestion (VM07), Gitea + Jenkins, Prometheus + Grafana,
-  node_exporter on every VM.
-- **Data acquisition**: read-only OPC-UA client on VM07 pulling from the plant
-  historian/SCADA through a data diode or strictly one-way firewall rule; store-and-forward
-  buffering; versioned tag mapping; unmapped tags are alerted on, never silently dropped.
-- **ML pipeline** (RUL + anomaly detection on rotating equipment — pumps, compressors,
-  motors, gearboxes): Layer 1 unsupervised autoencoder/VAE anomaly detection plus classical
-  FFT/envelope analysis of bearing frequencies (BPFO/BPFI/BSF/FTF), Layer 2 health-index →
-  remaining useful life with uncertainty bands, Layer 3 supervised fault classification
-  (bearing wear, misalignment, imbalance, cavitation, looseness) once labelled events
-  accumulate. Training logs to MLflow and registers `anvil-health`; promotion to `Staging`
-  is automatic, to `Production` it is a manual gate.
-- **Label acquisition**: every alert creates a CMMS work order; the technician's structured
-  close-out ("confirmed bearing degradation / no fault found / …") is fed back as training
-  data — the mechanism that makes the system improve over time.
-- **Serving** (FastAPI in Kubernetes): `POST /predict` (sensor window → health score, tier,
-  RUL distribution, explanation), `GET /health`, `GET /model-info`. The model is pulled from
-  the MLflow Model Registry at container startup (never baked into the image). Tiered
-  alerting (Watch/Plan/Urgent/Stop) lands in the maintenance workflow with explanations
-  operators can trust.
-- **Monitoring**: Prometheus scrapes node_exporter (all VMs), inference API, ingestion
-  status, and timescale_exporter; Grafana dashboards for node metrics, cluster, inference
-  API, model performance, sensor health, and an operator wall display.
-- **CI/CD** (Jenkins + Gitea, fully offline): test → train → evaluate → manual promotion
-  approval → build → deploy → smoke. All artifacts come from the VM12 mirror — no GitHub,
-  no public registries.
-- **Air-gap operations**: signed update bundles on approved media, pinned versions, no
-  `latest` tags, N-2 image retention on the mirror, nightly NAS backups (MLflow registry
-  included), quarterly restore drills, documented full-rebuild runbook.
+**Cost of not doing predictive maintenance**: Unplanned downtime in automotive manufacturing is 
+routinely cited in the range of tens of thousands of dollars per minute of stopped line; in 
+continuous process industries a single unplanned shutdown and restart can run into millions.
 
-## Key decisions (see `docs/architecture.md`)
+**Annual value, one line**: €470k - €700k (20-30% reduction from unplanned downtime of ~€2.34M/year).
 
-| Decision | Choice |
-|---|---|
-| Infrastructure provider | Plant hypervisor via Terraform libvirt provider (Proxmox/bare KVM); no cloud |
-| Network | DMZ `10.20.2.0/24`; one-way OT conduit; no internet exposure |
-| ML problem | RUL + anomaly detection on rotating equipment (3-layer: anomaly → trend → classify) |
-| ML framework | Autoencoder/VAE (PyTorch) + classical FFT/envelope analysis (numpy/scipy) |
-| Time-series store | TimescaleDB on VM08 (hypertables, continuous aggregates, compression) |
-| Ingestion | OPC-UA read-only client on VM07, store-and-forward buffering |
-| Inference API location | Kubernetes Deployment on the 3-node cluster |
-| MLflow location | Standalone on VM06 (stateful, simplest) |
-| Artifact mirror | Harbor + devpi + aptly + chart museum + provider mirror on VM12 |
-| CI/CD | Gitea + Jenkins on VM02 (fully offline) |
-| Model promotion | Staging automatic, Production manual (approval gate) |
-| Alerting | Tiered Watch/Plan/Urgent/Stop with explanations and CMMS integration |
+## Infrastructure Components
 
-## Repository layout
+### 1. Terraform — Infrastructure as Code
+- **What**: Provisions 12 VMs on plant hardware (libvirt/Proxmox)
+- **How**: `terraform init`, `terraform apply` provisions network + compute; local state on 
+  VM01 (no remote state service); modules for network, security-groups, compute
+- **Key files**: `terraform/main.tf`, `terraform/variables.tf`, `terraform/outputs.tf`, 
+  `terraform/modules/`
+- **Usage**: `terraform init`, `terraform apply -auto-approve`
+- **Enterprise justification**: Correct answer for on-premise; matches how plant IT actually 
+  operates (VMware/Proxmox); clear service boundaries; individually restorable; auditable by 
+  people who do not use Kubernetes
 
-```
-terraform/    hypervisor provisioning, 12 VMs (modules: network, security-groups, compute)
-ansible/      Inventory + site.yml + 9 playbooks + 12 roles (mirror first)
-docker/       fastapi / mlflow / training images
-kubernetes/   mlops namespace, inference + alerting deployments, HPA
-ml/           ingest, EDA notebook, signal processing, training (3 layers), evaluation
-api/          FastAPI app (model_loader, alerting, cmms, routers, db, metrics)
-monitoring/   Prometheus config + alert rules, Grafana dashboards
-scripts/      bootstrap, bundle import, inventory generator, train-and-register, smoke test
-cicd/         Jenkinsfile + pipeline stages
-docs/         Architecture, diagrams, guides, troubleshooting (see docs/)
-```
+### 2. Ansible — Configuration Management
+- **What**: Self-hosted configuration management; all 12 VMs configured from scratch
+- **How**: `ansible-playbook -i inventory/hosts.ini site.yml`; roles for mirror, common, 
+  docker, k8s-common, k8s-control-plane, k8s-worker, mlflow, timescaledb, cicd, ingest,
+  prometheus, node_exporter, grafana
+- **Key files**: `ansible/site.yml`, `ansible/playbooks/`, `ansible/roles/`
+- **Usage**: `ansible-playbook -i inventory/hosts.ini site.yml`
+- **Enterprise justification**: Air-gapped CI must be self-hosted; GitHub Actions requires the 
+  internet; same playbook runs against both provider groups; config parity verified, not assumed
 
-## Quickstart
+### 3. Kubernetes (kubeadm) — Container Orchestration
+- **What**: Self-managed K8s cluster (3 control plane + 2 workers)
+- **How**: kubeadm initialized on VM03-05; Calico CNI; join workers; identical across both 
+  providers; no managed control plane (GKE/EKS/OCI)
+- **Key files**: `kubernetes/`, `Makefile` targets
+- **Usage**: `kubectl apply -f kubernetes/`, `kubectl rollout restart`
+- **Enterprise justification**: The only way to keep the orchestration layer identical across 
+  providers; managed control plane is provider-specific by definition
 
-```bash
-# 0. OT security approval of the data-flow diagram (phase-0 gate)
+### 4. OPC-UA Ingestion — Data Acquisition
+- **What**: OPC-UA client subscribing to tags from plant historian/SCADA
+- **How**: Read-only, one-directional; store-and-forward buffering on VM07; tag mapping as 
+  versioned configuration; alert on unmapped tags
+- **Key files**: `ml/ingest/opcua_client.py`, `ml/ingest/tag_mapping.yml`, `VM07`
+- **Usage**: Tag mapping: `PLANT2.LINE3.PUMP7.VIB_AXIAL → machine_id=P7, sensor=vibration_axial, 
+  unit=mm/s`
+- **Enterprise justification**: The component most likely to sink the project; OT network never 
+  accepts a connection from the DMZ; where policy demands it, use a hardware data diode; where 
+  a diode is not funded, use strict egress-only firewall rules
 
-# 1. Provision infrastructure on the plant hypervisor
-cd terraform
-terraform init
-terraform apply -auto-approve
+### 5. TimescaleDB — Time-Series Store
+- **What**: PostgreSQL with hypertables, continuous aggregates, native compression
+- **How**: `create_hypertable('sensor_telemetry', 'time')`; materialized views for hourly stats; 
+  retention policy configurable
+- **Key files**: `sql/` schemas, `VM08`
+- **Usage**: Sensor telemetry table with 200 sensors × 1 Hz × 24/7 = ~17M points/day/machine
+- **Enterprise justification**: Required for 17M points/day/machine; vanilla PostgreSQL will not 
+  perform; compression ratios on time-series data materially change the storage budget
 
-# 2. Import the first signed update bundle (verified, then mirrored)
-cd ../scripts
-./import-update-bundle.sh anvil-update-2026-08.tar.gz
+### 6. FastAPI Serving — Model Inference
+- **What**: REST API for model inference in Kubernetes
+- **How**: FastAPI app with `/predict` endpoint; model loaded from MLflow Registry at pod 
+  startup; never baked into image
+- **Key files**: `api/main.py`, `api/app/`, `kubernetes/inference/`
+- **Usage**: `POST /predict` with sensor window → health score, tier, RUL, explanation
+- **Enterprise justification**: Serving runs in Kubernetes; model updates never require a 
+  rebuild; pulled from MLflow Registry at pod startup
 
-# 3. Generate Ansible inventory from the IP plan
-python3 generate-inventory.py > ../ansible/inventory/hosts.ini
+### 7. MLflow — Tracking + Registry
+- **What**: Standalone MLflow on VM06, backed by TimescaleDB
+- **How**: `mlflow server --backend-store-uri postgresql://...; artifact store local disk/NAS` 
+  (no object storage in air gap)
+- **Key files**: `VM06`, `mlflow/` directory
+- **Usage**: Experiment tracking, model registry, version staging
+- **Enterprise justification**: No outbound connectivity means no SaaS registry, at all; 
+  backend store PostgreSQL in same TimescaleDB instance
 
-# 4. Configure everything (mirror first)
-cd ../ansible
-ansible-playbook -i inventory/hosts.ini site.yml
+### 8. CI/CD — Jenkins (Fully Offline)
+- **What**: Self-hosted CI/CD; no GitHub Actions (requires internet)
+- **How**: Jenkins on VM02; Gitea webhooks; all artifacts push to local Harbor mirror on VM12; 
+  never to public registry
+- **Key files**: `cicd/Jenkinsfile`, `cicd/stages/`
+- **Usage**: Pipeline stages: test → build → train → evaluate → promote → deploy → smoke
+- **Enterprise justification**: No `latest` tags anywhere; a `latest` tag in an air-gapped 
+  environment is a build that cannot be reproduced
 
-# 5. Verify MLflow + TimescaleDB
-curl http://10.20.2.30:5000/health
-psql -h 10.20.2.40 -U mlflow -d mlflow -c '\dt'
+### 9. Monitoring — Prometheus/Grafana
+- **What**: Platform metrics and operator dashboards
+- **How**: Prometheus scrapes (node_exporter, kubernetes-nodes/pods/cadvisor, inference-api, 
+  timescale_exporter, mlflow); Grafana dashboards (node-exporter, kubernetes-cluster, 
+  inference-api, model-performance, sensor-health, operator-line)
+- **Key files**: `monitoring/prometheus/`, `monitoring/grafana/dashboards/`
+- **Usage**: Alert rules (InferenceHighErrorRate, InferenceHighLatency, IngestionStalled, 
+  SensorFlatline, UnmappedTags, NoModelLoaded, RegistryBackupStale)
+- **Enterprise justification**: Plant operations already run Grafana on a wall display; this 
+  is the native idiom
 
-# 6. Verify the OPC-UA ingestion path
-curl http://10.20.2.31:8000/ingest/status
+### 11. Air-Gap Operations — Update Procedure
+- **What**: How dependencies are updated in air-gapped environment
+- **How**: Internet-connected staging machine → pull required images/packages/providers at 
+  pinned versions → vulnerability scanning (Trivy) → export to signed bundle → physical 
+  transfer on approved removable media → verify signature → import to VM12 mirrors → deploy 
+  to staging namespace → promote to production in approved maintenance window
+- **Enterprise justification**: Update cadence is monthly at best, quarterly in practice; 
+  pin every version; no `latest` tags; keep N-2 versions of every image on the mirror
 
-# 7. Train and register the first model (manual promotion gate; shadow mode first)
-../scripts/train-and-register.sh
-
-# 8. Deploy the inference + alerting layers to Kubernetes
-kubectl apply -f kubernetes/namespace.yml
-kubectl apply -f kubernetes/inference/
-kubectl apply -f kubernetes/alerting/
-kubectl apply -f kubernetes/hpa.yml
-
-# 9. Smoke test
-./scripts/smoke-test.sh
-
-# 10. Verify monitoring
-curl http://10.20.2.50:9090/-/healthy
-curl http://10.20.2.51:3000/api/health
-```
-
-`scripts/bootstrap.sh` wraps steps 1-5. A `Makefile` mirrors the same targets.
-
-See `docs/` for architecture diagrams, deployment guide (including the update-bundle
-procedure and backups), API documentation, training guide, and troubleshooting.
-
-## Model promotion workflow
+## Repository Structure
 
 ```
-train.py  →  registers version in MLflow Registry + transitions to Staging
-evaluate.py → compares new model against current Production (precision tolerance)
-train-and-register.sh --promote  →  manual approval → Production
+anvil-platform/
+├── README.md
+├── Makefile
+├── .gitignore
+├── terraform/                  # 12 VM definitions, network, security, compute
+├── ansible/                    # playbooks, roles, inventory
+├── docker/                     # FastAPI, MLflow, training Dockerfiles
+├── kubernetes/                 # namespace, inference, alerting, HPA manifests
+├── ml/                         # data, ingest, notebooks, training, evaluation, models
+├── api/                        # FastAPI app, routers, schemas, db, metrics, tests
+├── monitoring/                 # prometheus, grafana dashboards
+├── scripts/                    # bootstrap, inventory, import-update-bundle, train-and-register,
+│   smoke-test
+├── cicd/                       # Jenkinsfile, stages (test, build, train, evaluate, promote, deploy, smoke)
+└── docs/                       # architecture, ml-pipeline-diagram, infrastructure, deployment,
+    api-documentation, training-guide, troubleshooting
 ```
 
-## Verification
+## Deployment Workflow
 
-```bash
-make validate        # py_compile all python, YAML/JSON lint, terraform validate, ansible syntax-check
-make train           # run training pipeline end-to-end (needs MLflow reachable)
-make smoke           # POST a sample sensor window to /predict
-```
+1. Provision infrastructure (Terraform on libvirt/Proxmox)
+2. Import signed update bundle onto VM12
+3. Generate Ansible inventory
+4. Configure everything (mirror first, then services)
+5. Verify MLflow + TimescaleDB
+6. Verify ingestion is live
+7. Train and register the first model (shadow mode)
+8. Deploy inference + alerting layers to Kubernetes
+9. Smoke test
+10. Verify monitoring
 
-## License
+Total: ~62 working days, of which phase 15 (shadow mode) is mostly waiting.
 
-Enterprise reference implementation. No warranty.
+**Phase 15 is non-negotiable**: Run the system in shadow mode for a month before a single 
+alert reaches an operator. Measure precision against reality first.

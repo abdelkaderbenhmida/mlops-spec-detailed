@@ -33,7 +33,7 @@ mlflow_port: 5000
 mlflow_tracking_uri: "http://{{ mlflow_host }}:{{ mlflow_port }}"
 
 # Model registry contract used by FastAPI.
-model_name: churn-model
+model_name: maintenance-model
 model_stage: Production
 
 # Monitoring scrape config shared bits.

@@ -4,12 +4,16 @@ set -euo pipefail
 
 BASE_URL="${API_BASE_URL:-http://localhost:8000}"
 
+# Matches api/app/schemas.py::PredictRequest (rotating-equipment sensor window).
 payload='{
-  "tenure_months": 12,
-  "monthly_charges": 70.5,
-  "total_charges": 786.0,
-  "contract_type": "month-to-month",
-  "payment_method": "electronic_check"
+  "equipment_type": "pump",
+  "age_months": 60,
+  "operating_hours": 20000.0,
+  "maintenance_history": 5,
+  "sensor_temp": 70.0,
+  "sensor_vibration": 1.0,
+  "sensor_pressure": 35.0,
+  "sensor_humidity": 50.0
 }'
 
 echo "== health =="
@@ -26,8 +30,9 @@ import json
 import sys
 
 resp = json.loads(sys.argv[1])
-assert "prediction" in resp, f"missing 'prediction' in {resp}"
-assert "probability" in resp, f"missing 'probability' in {resp}"
+for key in ("prediction", "probability", "risk_level", "model_version", "model_stage"):
+    assert key in resp, f"missing '{key}' in {resp}"
+assert resp["prediction"] in ("failure", "no_failure"), f"unexpected prediction: {resp}"
 assert 0.0 <= float(resp["probability"]) <= 1.0, f"probability out of range: {resp}"
 print("OK: /predict returned", resp["prediction"], "with probability", resp["probability"])
 EOF

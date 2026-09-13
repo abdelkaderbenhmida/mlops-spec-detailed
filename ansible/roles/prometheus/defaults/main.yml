@@ -1,0 +1,8 @@
+---
+# Canonical monitoring configuration lives in the repository's monitoring/
+# directory (spec section 4). The role deploys those files directly rather than
+# keeping a second copy under files/, which previously drifted: the deployed
+# rules were missing the node-level alerts.
+prometheus_config_src: "{{ playbook_dir }}/../monitoring/prometheus/prometheus.yml"
+prometheus_rules_src: "{{ playbook_dir }}/../monitoring/prometheus/alert.rules.yml"
+prometheus_rules_dest: /etc/prometheus/rules/alert.rules.yml
