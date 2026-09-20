@@ -1,22 +1,23 @@
 ---
-# Variables shared by every host in the platform.
-admin_user: admin
-ssh_user: admin
+# Variables shared by every host in the platform — ALL-LOCAL EDITION.
+# No cloud: every logical host maps to 127.0.0.1 with a local connection.
+admin_user: gadour
+ssh_user: gadour
 
-# IP plan from the spec section 2.
+# Local single-host plan (replaces the old 10.0.2.0/24 private-cloud IP plan).
 ips:
-  ctrl_node: "10.0.2.10"
-  git_cicd: "10.0.2.11"
-  k8s_cp: "10.0.2.20"
-  k8s_wk1: "10.0.2.21"
-  k8s_wk2: "10.0.2.22"
-  mlflow: "10.0.2.30"
-  fastapi: "10.0.2.31"
-  postgres: "10.0.2.40"
-  prometheus: "10.0.2.50"
-  grafana: "10.0.2.51"
-  training: "10.0.2.60"
-  testing: "10.0.2.61"
+  ctrl_node: "127.0.0.1"
+  git_cicd: "127.0.0.1"
+  k8s_cp: "127.0.0.1"
+  k8s_wk1: "127.0.0.1"
+  k8s_wk2: "127.0.0.1"
+  mlflow: "127.0.0.1"
+  fastapi: "127.0.0.1"
+  postgres: "127.0.0.1"
+  prometheus: "127.0.0.1"
+  grafana: "127.0.0.1"
+  training: "127.0.0.1"
+  testing: "127.0.0.1"
 
 # PostgreSQL (VM08) used by the app AND as the MLflow backend store.
 postgres_host: "{{ ips.postgres }}"

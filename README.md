@@ -3,7 +3,15 @@
 > **On-premise predictive maintenance for manufacturing plants where production data is not 
 > permitted to leave the site.**
 
-## Product: Anvil — Predictive Maintenance on Rotating Equipment
+![Python](https://img.shields.io/badge/Python-3.11%7C3.12-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Stack](https://img.shields.io/badge/stack-AirGap%2FIEC62443-blueviolet.svg)
+![Deploy](https://img.shields.io/badge/deploy-Terraform%2BAnsible%2BK8s-orange.svg)
+
+Anvil runs **entirely inside the plant** --- 12 VMs, zero internet, no managed
+services --- turning sensor telemetry into predictive-maintenance alerts.
+
+## Product: Anvil --- Predictive Maintenance on Rotating Equipment
 
 Anvil is a complete ML platform that installs inside the plant, on the plant's own hardware, 
 with no internet connection, ever. Designed for environments where managed services are not 

@@ -58,7 +58,7 @@ def main():
     model_uri = f"models:/{MODEL_NAME}/{version.version}"
     logger.info("Evaluating %s v%s", MODEL_NAME, version.version)
 
-    clf = mlflow.sklearn.load_model(model_uri)
+    clf = mlflow.xgboost.load_model(model_uri)
 
     X_train, X_test, y_train, y_test = load_and_preprocess()
 

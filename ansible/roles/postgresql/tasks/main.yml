@@ -23,11 +23,11 @@
   become: true
   notify: restart postgresql
 
-- name: Allow private subnet connections
+- name: Allow local connections
   lineinfile:
     path: /etc/postgresql/14/main/pg_hba.conf
-    regexp: "^host.*10\\.0\\.2\\.0/24"
-    line: "host    all             all             10.0.2.0/24            md5"
+    regexp: "^host.*127\\.0\\.0\\.1/32"
+    line: "host    all             all             127.0.0.1/32            md5"
   become: true
   notify: restart postgresql
 

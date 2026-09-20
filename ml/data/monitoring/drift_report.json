@@ -1,1 +1,46 @@
-{"reference_path": "/tmp/pytest-of-gadour/pytest-6/test_trigger_does_not_fire_wit0/maintenance.csv", "current_path": "/tmp/pytest-of-gadour/pytest-6/test_trigger_does_not_fire_wit0/maintenance.csv", "n_features": 7, "drift_score": 0.0, "threshold": 0.3, "drift_detected": false, "drifted_features": [], "features": {"age_months": {"ks_statistic": 0.0, "p_value": 1.0, "drifted": false}, "operating_hours": {"ks_statistic": 0.0, "p_value": 1.0, "drifted": false}, "maintenance_history": {"ks_statistic": 0.0, "p_value": 1.0, "drifted": false}, "sensor_temp": {"ks_statistic": 0.0, "p_value": 1.0, "drifted": false}, "sensor_vibration": {"ks_statistic": 0.0, "p_value": 1.0, "drifted": false}, "sensor_pressure": {"ks_statistic": 0.0, "p_value": 1.0, "drifted": false}, "sensor_humidity": {"ks_statistic": 0.0, "p_value": 1.0, "drifted": false}}}
+{
+  "reference_path": "ml/data/raw/maintenance.csv",
+  "current_path": "ml/data/raw/maintenance.csv",
+  "n_features": 7,
+  "drift_score": 0.0,
+  "threshold": 0.3,
+  "drift_detected": false,
+  "drifted_features": [],
+  "features": {
+    "age_months": {
+      "ks_statistic": 0.0,
+      "p_value": 1.0,
+      "drifted": false
+    },
+    "operating_hours": {
+      "ks_statistic": 0.0,
+      "p_value": 1.0,
+      "drifted": false
+    },
+    "maintenance_history": {
+      "ks_statistic": 0.0,
+      "p_value": 1.0,
+      "drifted": false
+    },
+    "sensor_temp": {
+      "ks_statistic": 0.0,
+      "p_value": 1.0,
+      "drifted": false
+    },
+    "sensor_vibration": {
+      "ks_statistic": 0.0,
+      "p_value": 1.0,
+      "drifted": false
+    },
+    "sensor_pressure": {
+      "ks_statistic": 0.0,
+      "p_value": 1.0,
+      "drifted": false
+    },
+    "sensor_humidity": {
+      "ks_statistic": 0.0,
+      "p_value": 1.0,
+      "drifted": false
+    }
+  }
+}

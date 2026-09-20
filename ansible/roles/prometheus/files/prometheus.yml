@@ -10,45 +10,20 @@ alerting:
     - static_configs:
         - targets: []
 
+# All-local: single-host lab (docker/compose.local.yml). No private-network IPs.
 scrape_configs:
-  # node_exporter on all 12 VMs (ports: 22, 8080, 6443, 5000, 8000, 5432, 9090, 3000, 9100)
   - job_name: node-exporter
     static_configs:
       - targets:
-          - 10.0.2.10:9100  # ctrl-node
-          - 10.0.2.11:9100  # git-cicd
-          - 10.0.2.20:9100  # k8s-cp
-          - 10.0.2.21:9100  # k8s-wk1
-          - 10.0.2.22:9100  # k8s-wk2
-          - 10.0.2.30:9100  # mlflow
-          - 10.0.2.31:9100  # fastapi
-          - 10.0.2.40:9100  # postgres
-          - 10.0.2.50:9100  # prometheus
-          - 10.0.2.51:9100  # grafana
-          - 10.0.2.60:9100  # training-env
-          - 10.0.2.61:9100  # testing-env
+          - localhost:9100
 
-  # postgres_exporter on VM08.
   - job_name: postgres-exporter
     static_configs:
       - targets:
-          - 10.0.2.40:9187
+          - localhost:9187
 
-  # FastAPI served inside Kubernetes, scraped through the NodePort.
   - job_name: fastapi
+    metrics_path: /metrics
     static_configs:
       - targets:
-          - 10.0.2.31:8000  # standalone VM07 (optional)
-          - 10.0.2.21:31100  # k8s-wk1 NodePort -> fastapi service
-          - 10.0.2.22:31100  # k8s-wk2 NodePort -> fastapi service
-
-  # Kubernetes components are reached through node exporters; the API server
-  # requires auth and is optional for this lab.
-  - job_name: kubernetes-apiserver
-    scheme: https
-    tls_config:
-      insecure_skip_verify: true
-    bearer_token_file: /etc/prometheus/k8s.token
-    static_configs:
-      - targets:
-          - 10.0.2.20:6443
+          - localhost:8000
